@@ -938,7 +938,6 @@ const ProcessingPage: React.FC = () => {
     startDataStream(
       data,
       (eventData: string) => {
-        debugger;
         console.log("收到消息:", eventData);
         try {
           // 解析 SSE 消息
