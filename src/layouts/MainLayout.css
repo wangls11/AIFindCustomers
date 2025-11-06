@@ -1,0 +1,98 @@
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.layout-header {
+  background-color: #f0f0f0;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.layout-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.layout-nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-link {
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  color: #333;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.nav-link:hover {
+  background-color: #e0e0e0;
+}
+
+/* Header from Home: .top/.logo/.brand/.icon */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.icon:hover {
+  background: #f3f4f6;
+}
+
+.layout-content {
+  flex: 1;
+}
+
+.layout-footer {
+  background-color: #f0f0f0;
+  padding: 1rem 2rem;
+  border-top: 1px solid #ddd;
+  text-align: center;
+}
+
+.layout-footer p {
+  margin: 0;
+  color: #666;
+}
