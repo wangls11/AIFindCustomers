@@ -519,7 +519,6 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #eff6ff;
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 12px;
@@ -531,7 +530,7 @@ body {
 
 .score-value {
   font-weight: 600;
-  color: #3b82f6;
+  font-size: 20px;
 }
 
 .score-stars {
@@ -540,8 +539,8 @@ body {
 
 .card-meta {
   display: flex;
+  justify-content: space-between;
   gap: 16px;
-  margin-bottom: 8px;
   font-size: 12px;
   color: #666;
 }

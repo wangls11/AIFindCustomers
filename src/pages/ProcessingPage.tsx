@@ -6,6 +6,8 @@ import {
   getUserAnalysisPlan,
   startDataStream,
   terminateData,
+  abortData,
+  checkResume,
   type UserAnalysisPlanVO,
 } from "@/api";
 import "./ProcessingPage.css";
@@ -24,6 +26,8 @@ type Company = {
   risk: string;
   tags: Tag[];
   archive?: string;
+  recordId?: string;
+  tableId?: string;
 };
 
 const companiesData: Company[] = [
@@ -469,12 +473,16 @@ const ProcessingPage: React.FC = () => {
     content: string;
   } | null>(null);
   const [sortDropdownShow, setSortDropdownShow] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null); // 任务 ID
+  const [currentTableId, setCurrentTableId] = useState<string>(""); // 当前表格 ID
 
   const pageSize = 10;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const isPausedRef = useRef<boolean>(false);
   const isTerminatedRef = useRef<boolean>(false);
+  const tableRef = useRef<any>(null);
+  const requestIdRef = useRef<string | null>(null);
 
   const goBack = () => {
     if (isLoading && !isTerminated) {
@@ -529,6 +537,10 @@ const ProcessingPage: React.FC = () => {
   }, [isTerminated]);
 
   useEffect(() => {
+    requestIdRef.current = requestId;
+  }, [requestId]);
+
+  useEffect(() => {
     (async () => {
       const sdk: any = bitable ?? (window as any).bitable;
       const userId = await sdk.bridge.getUserId();
@@ -540,6 +552,7 @@ const ProcessingPage: React.FC = () => {
       const res = (await getUserAnalysisPlan(userId)) as UserAnalysisPlanVO;
 
       const table = await sdk.base.getTable(res.tableId);
+      tableRef.current = table; // 保存 table 对象到 ref
       try {
         const meta = await table.getMeta?.();
         const name = meta?.name ?? (await table.getName?.());
@@ -695,6 +708,9 @@ const ProcessingPage: React.FC = () => {
             };
           });
 
+          // 保存 tableId 到 state
+          setCurrentTableId(res.tableId || "");
+
           startProcessing({
             appToken: extractDynamicId(bitableUrl) || "",
             tableId: res.tableId || "",
@@ -711,12 +727,37 @@ const ProcessingPage: React.FC = () => {
     })();
   }, []);
 
-  const handlePauseToggle = () => {
+  const handlePauseToggle = async () => {
+    const currentRequestId = requestIdRef.current;
+    if (!currentRequestId) {
+      Toast.warning({ content: "任务 ID 未获取，无法暂停/继续", duration: 3 });
+      return;
+    }
+
     if (!isPaused) {
-      Toast.info({ content: "分析已暂停，您可随时继续", duration: 3 });
-      setIsPaused(true);
+      // 暂停
+      try {
+        await abortData(currentRequestId);
+        Toast.info({ content: "分析已暂停，您可随时继续", duration: 3 });
+        setIsPaused(true);
+      } catch (error) {
+        console.error("暂停失败:", error);
+        Toast.error({ content: "暂停失败，请重试", duration: 3 });
+      }
     } else {
-      setIsPaused(false);
+      // 继续
+      try {
+        const canResume = await checkResume(currentRequestId);
+        if (canResume?.data) {
+          setIsPaused(false);
+          Toast.success({ content: "分析已继续", duration: 3 });
+        } else {
+          Toast.warning({ content: "无法继续，任务可能已终止", duration: 3 });
+        }
+      } catch (error) {
+        console.error("继续失败:", error);
+        Toast.error({ content: "继续失败，请重试", duration: 3 });
+      }
     }
   };
 
@@ -804,6 +845,151 @@ const ProcessingPage: React.FC = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // 更新多维表格记录字段
+  const updateRecordFields = async (
+    table: any,
+    recordId: string,
+    fields: Array<{
+      fieldId: string;
+      type: string | null;
+      fieldName: string;
+      fieldValue: string | null;
+    }>
+  ) => {
+    try {
+      // 获取记录 - 使用 getRecords 方法，传入 recordIds 参数
+      let recordsResult;
+      try {
+        // 尝试使用 recordIds 参数
+        recordsResult = await table.getRecords({ recordIds: [recordId] });
+      } catch (e) {
+        // 如果 recordIds 参数不支持，则获取所有记录后过滤
+        const allRecords = await table.getRecords({});
+        recordsResult = {
+          records: allRecords.records.filter(
+            (r: any) => r.recordId === recordId
+          ),
+        };
+      }
+
+      const records = recordsResult.records || [];
+      if (records.length === 0) {
+        console.warn(`未找到记录: ${recordId}`);
+        return;
+      }
+
+      const record = records[0];
+
+      // 获取所有字段元数据，用于确定字段类型
+      const fieldMetaList = await table.getFieldMetaList();
+      const fieldMetaMap = new Map<string, any>();
+      fieldMetaList.forEach((meta: any) => {
+        fieldMetaMap.set(meta.id, meta);
+      });
+
+      // 构建要更新的字段值对象
+      const fieldsToUpdate: Record<string, any> = {};
+
+      // 遍历字段并准备更新数据
+      for (const field of fields) {
+        // 跳过空值
+        if (field.fieldValue === null || field.fieldValue === undefined) {
+          continue;
+        }
+
+        const fieldId = field.fieldId;
+        const fieldValue = field.fieldValue;
+        const fieldMeta = fieldMetaMap.get(fieldId);
+
+        if (!fieldMeta) {
+          console.warn(`未找到字段元数据: ${fieldId} (${field.fieldName})`);
+          continue;
+        }
+
+        try {
+          // 根据字段类型设置值
+          const fieldType = fieldMeta.type;
+          let valueToSet: any = fieldValue;
+
+          // 处理不同字段类型（支持数字枚举值和 FieldType 枚举）
+          if (fieldType === FieldType.Number || fieldType === 2) {
+            // 数字字段：尝试转换为数字
+            const numValue = parseFloat(String(fieldValue));
+            if (!isNaN(numValue)) {
+              valueToSet = numValue;
+            } else {
+              console.warn(
+                `无法将值转换为数字: ${fieldValue} (字段: ${field.fieldName})`
+              );
+              continue;
+            }
+          } else if (fieldType === FieldType.DateTime || fieldType === 5) {
+            // 日期时间字段：转换为时间戳（毫秒）
+            const dateValue = new Date(String(fieldValue));
+            if (!isNaN(dateValue.getTime())) {
+              valueToSet = dateValue.getTime();
+            } else {
+              console.warn(
+                `无法将值转换为日期: ${fieldValue} (字段: ${field.fieldName})`
+              );
+              continue;
+            }
+          } else if (fieldType === FieldType.Text || fieldType === 1) {
+            // 文本字段：直接使用字符串
+            valueToSet = String(fieldValue);
+          } else {
+            // 其他类型：尝试直接使用字符串
+            valueToSet = String(fieldValue);
+          }
+
+          fieldsToUpdate[fieldId] = valueToSet;
+        } catch (error) {
+          console.error(`处理字段失败: ${field.fieldName} (${fieldId})`, error);
+        }
+      }
+
+      // 批量更新字段值
+      if (Object.keys(fieldsToUpdate).length > 0) {
+        try {
+          // 尝试使用 setRecords 方法更新记录
+          if (typeof table.setRecords === "function") {
+            await table.setRecords([
+              {
+                recordId: recordId,
+                fields: fieldsToUpdate,
+              },
+            ]);
+          } else if (record && typeof record.setCellValue === "function") {
+            // 如果 setRecords 不存在，尝试使用 record.setCellValue 逐个更新
+            for (const [fieldId, value] of Object.entries(fieldsToUpdate)) {
+              await record.setCellValue(fieldId, value);
+            }
+          } else {
+            // 如果都不存在，尝试使用 addRecords 的更新模式或其他方法
+            console.warn("未找到可用的更新记录方法");
+            // 尝试直接调用可能存在的更新方法
+            if (typeof table.updateRecords === "function") {
+              await table.updateRecords([
+                {
+                  recordId: recordId,
+                  fields: fieldsToUpdate,
+                },
+              ]);
+            } else {
+              throw new Error("未找到可用的更新记录方法");
+            }
+          }
+        } catch (updateError) {
+          console.error("更新记录时出错:", updateError);
+          throw updateError;
+        }
+      }
+    } catch (error) {
+      console.error(`更新记录失败: ${recordId}`, error);
+      throw error;
+    }
+  };
+
   // 将字段数组转换为 Company 对象
   const convertFieldsToCompany = (
     fields: Array<{
@@ -812,7 +998,9 @@ const ProcessingPage: React.FC = () => {
       fieldName: string;
       fieldValue: string;
     }>,
-    rank: number
+    rank: number,
+    recordId?: string,
+    tableId?: string
   ): Company => {
     // 创建一个字段映射对象，方便查找
     const fieldMap = new Map<string, string>();
@@ -924,6 +1112,8 @@ const ProcessingPage: React.FC = () => {
       completeness,
       risk,
       tags,
+      recordId,
+      tableId,
     };
   };
 
@@ -943,16 +1133,44 @@ const ProcessingPage: React.FC = () => {
           // 解析 SSE 消息
           const parsedData = JSON.parse(eventData);
 
+          // 处理 REQUEST_ID 事件，获取任务 ID
+          if (
+            parsedData &&
+            (parsedData.event === "REQUEST_ID" ||
+              parsedData.event === "request_id")
+          ) {
+            const taskId = parsedData.data;
+            if (taskId) {
+              setRequestId(taskId);
+              requestIdRef.current = taskId;
+              console.log("获取到任务 ID:", taskId);
+            }
+            return; // REQUEST_ID 事件不需要继续处理
+          }
+
           // 检查是否有 field 数组
           if (
             parsedData &&
             parsedData.data &&
             Array.isArray(parsedData.data.fields)
           ) {
+            // 更新多维表格记录字段
+            if (parsedData.data.recordId && tableRef.current) {
+              updateRecordFields(
+                tableRef.current,
+                parsedData.data.recordId,
+                parsedData.data.fields
+              ).catch((error) => {
+                console.error("更新记录字段失败:", error);
+              });
+            }
+
             // 转换为 Company 对象
             const company = convertFieldsToCompany(
               parsedData.data.fields,
-              currentRank
+              currentRank,
+              parsedData.data.recordId,
+              data.tableId
             );
 
             // 生成档案内容
@@ -960,8 +1178,21 @@ const ProcessingPage: React.FC = () => {
 
             // 更新状态
             setFilteredData((prev) => {
-              const newData = [...prev, company];
-              return newData;
+              // 检查是否已存在相同的 recordId
+              const existingIndex = prev.findIndex(
+                (item) => item.recordId === company.recordId
+              );
+
+              if (existingIndex !== -1) {
+                // 如果存在，更新原有的 item 内容
+                const newData = [...prev];
+                newData[existingIndex] = company;
+                return newData;
+              } else {
+                // 如果不存在，添加新的 item
+                const newData = [...prev, company];
+                return newData;
+              }
             });
 
             // 更新加载计数
@@ -1166,8 +1397,34 @@ const ProcessingPage: React.FC = () => {
       });
   };
 
-  const openInFeishu = (companyName: string) => {
-    alert(`即将在飞书中打开: ${companyName} 的完整数据`);
+  const openInFeishu = async (companyName: string) => {
+    const company = filteredData.find((c) => c.name === companyName);
+    if (!company || !company.recordId) {
+      Toast.warning({ content: "未找到记录信息", duration: 3 });
+      return;
+    }
+
+    const tableId = company.tableId || currentTableId;
+    if (!tableId) {
+      Toast.warning({ content: "未找到表格信息", duration: 3 });
+      return;
+    }
+
+    try {
+      const sdk: any = bitable ?? (window as any).bitable;
+      if (!sdk?.ui?.showRecordDetailDialog) {
+        Toast.warning({ content: "当前环境不支持显示详情弹窗", duration: 3 });
+        return;
+      }
+
+      await sdk.ui.showRecordDetailDialog({
+        tableId: tableId,
+        recordId: company.recordId,
+      });
+    } catch (error) {
+      console.error("打开详情弹窗失败:", error);
+      Toast.error({ content: "打开详情弹窗失败，请重试", duration: 3 });
+    }
   };
 
   // 终止处理
@@ -1190,7 +1447,17 @@ const ProcessingPage: React.FC = () => {
       onOk: async () => {
         try {
           setTerminating(true);
-          // 如需调用后端终止接口，请在此获取 id 后调用 terminateData(id)
+          const currentRequestId = requestIdRef.current;
+
+          // 调用后端终止接口
+          if (currentRequestId) {
+            try {
+              await terminateData(currentRequestId);
+            } catch (error) {
+              console.error("终止任务失败:", error);
+              // 即使 API 调用失败，也继续执行本地终止逻辑
+            }
+          }
 
           const processedCount = loadedCount;
           const hasProcessed = processedCount > 0;
@@ -1471,18 +1738,11 @@ const ProcessingPage: React.FC = () => {
               >
                 <div style={{ flexGrow: 1 }}>
                   <div className="card-top">
-                    <div className="company-rank">{badge as any}</div>
                     <div className="company-name">{company.name}</div>
                     <div className="score-badge">
-                      <span className="score-icon">📊</span>
                       <span className="score-value">{company.score}分</span>
-                      <span className="score-stars">{stars}</span>
+                      {/* <span className="score-stars">{stars}</span> */}
                     </div>
-                  </div>
-                  <div className="card-meta">
-                    <span>{company.financing}</span>
-                    <span>{company.employees}</span>
-                    <span>成立{company.founded}</span>
                   </div>
                   <div className="card-tags">
                     {company.tags.map((tag, i) => (
@@ -1490,6 +1750,11 @@ const ProcessingPage: React.FC = () => {
                         ✓{tag.text}
                       </span>
                     ))}
+                  </div>
+                  <div className="card-meta">
+                    <span>{company.financing}</span>
+                    <span>{company.employees}</span>
+                    <span>{company.founded}成立</span>
                   </div>
                 </div>
                 <div

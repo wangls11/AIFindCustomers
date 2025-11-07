@@ -38,7 +38,7 @@ const errorInterceptors: ErrorInterceptor[] = [];
 // 默认配置
 const defaultConfig: RequestConfig = {
   baseURL: import.meta.env.VITE_API_BASE_URL || "",
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 10000,
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 300000, // 默认5分钟（300000毫秒）
   headers: {
     "Content-Type": "application/json;charset=UTF-8",
   },
@@ -138,7 +138,61 @@ const defaultErrorInterceptor: ErrorInterceptor = (error) => {
         message = `失败 (${error.status})`;
     }
   } else if (error.name === "AbortError") {
-    message = "请求已取消";
+    // 检查是否是超时导致的取消
+    const abortError = error as any;
+    const errorMessage = error.message || "";
+
+    // 检查 error.reason (现代浏览器支持)
+    const errorReason = abortError.reason;
+    const reasonMessage =
+      errorReason?.message ||
+      (typeof errorReason === "string" ? errorReason : "") ||
+      "";
+
+    // 检查 signal.reason (如果 error 有 signal 属性)
+    const signalReason = abortError.signal?.reason;
+    const signalReasonMessage =
+      signalReason?.message ||
+      (typeof signalReason === "string" ? signalReason : "") ||
+      "";
+
+    // 检查 error.cause (Error 构造函数支持)
+    const errorCause = (error as Error).cause;
+    const causeMessage =
+      (errorCause && typeof errorCause === "object" && "message" in errorCause
+        ? (errorCause as { message: string }).message
+        : typeof errorCause === "string"
+        ? errorCause
+        : "") || "";
+
+    // 检查所有可能包含 timeout 的地方
+    const allMessages = [
+      errorMessage,
+      reasonMessage,
+      signalReasonMessage,
+      causeMessage,
+    ].map((m) => String(m).toLowerCase());
+
+    const isTimeout = allMessages.some((m) => m.includes("timeout"));
+
+    // 特殊处理: "BodyStreamBuffer was aborted" 如果找不到明确的取消原因，
+    // 且配置了超时，很可能是超时导致的
+    const isBodyStreamAborted = errorMessage.includes(
+      "BodyStreamBuffer was aborted"
+    );
+    const likelyTimeout =
+      isBodyStreamAborted &&
+      !allMessages.some(
+        (m) => m.includes("cancelled") || m.includes("cancel")
+      ) &&
+      defaultConfig.timeout &&
+      defaultConfig.timeout > 0;
+
+    if (isTimeout || likelyTimeout) {
+      message = "网络连接超时，请检查网络";
+    } else {
+      message = "请求已取消";
+    }
   } else if (error.message?.includes("timeout")) {
     message = "网络连接超时，请检查网络";
   }
@@ -223,7 +277,7 @@ const processBody = (data: any, headers: Headers): BodyInit | null => {
 // 创建超时控制器
 const createTimeoutController = (timeout: number): AbortController => {
   const controller = new AbortController();
-  setTimeout(() => controller.abort(), timeout);
+  setTimeout(() => controller.abort(new Error("Request timeout")), timeout);
   return controller;
 };
 
@@ -276,10 +330,15 @@ const request = async <T = any>(
     if (timeoutController && finalConfig.signal) {
       const combinedController = new AbortController();
       timeoutController.signal.addEventListener("abort", () =>
-        combinedController.abort()
+        combinedController.abort(
+          (timeoutController.signal as any).reason ||
+            new Error("Request timeout")
+        )
       );
       finalConfig.signal.addEventListener("abort", () =>
-        combinedController.abort()
+        combinedController.abort(
+          (finalConfig.signal as any)?.reason || new Error("Request cancelled")
+        )
       );
       signal = combinedController.signal;
     } else if (timeoutController) {
@@ -435,7 +494,8 @@ export const stream = (
         headers: {
           ...defaultConfig.headers,
           ...config.headers,
-          Accept: "text/event-stream, */*",
+          Accept: "text/event-stream",
+          Connection: "keep-alive",
         },
       };
 
@@ -468,10 +528,15 @@ export const stream = (
       if (timeoutController) {
         const combinedController = new AbortController();
         timeoutController.signal.addEventListener("abort", () =>
-          combinedController.abort()
+          combinedController.abort(
+            (timeoutController!.signal as any).reason ||
+              new Error("Request timeout")
+          )
         );
         controller.signal.addEventListener("abort", () =>
-          combinedController.abort()
+          combinedController.abort(
+            (controller.signal as any).reason || new Error("Request cancelled")
+          )
         );
         signal = combinedController.signal;
       }
