@@ -13,7 +13,7 @@ const router = createBrowserRouter([
     element: <MainLayout />,
     children: [
       {
-        index: true,
+        // index: true,
         element: <Home />,
       },
       {
@@ -21,8 +21,8 @@ const router = createBrowserRouter([
         element: <SelectPlanPage />,
       },
       {
-        path: "processing",
-        // index: true,
+        // path: "processing",
+        index: true,
 
         element: <ProcessingPage />,
       },
