@@ -68,9 +68,10 @@ export function saveUserAnalysisPlan(dto: UserAnalysisPlanDTO) {
  * Content-Type: application/x-www-form-urlencoded
  * 请求参数：userId (string)
  */
-export function getUserAnalysisPlan(userId: string) {
+export function getUserAnalysisPlan({table_id, view_id}: {table_id: string; view_id: string}) {
   const params = new URLSearchParams();
-  params.append("userId", userId);
+  params.append("table_id", table_id);
+  params.append("view_id", view_id);
 
   return post<ResultVO<UserAnalysisPlanVO>>(
     "/api/user/userAnalysisPlan/get",

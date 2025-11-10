@@ -543,13 +543,16 @@ const ProcessingPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       const sdk: any = bitable ?? (window as any).bitable;
-      const userId = await sdk.bridge.getUserId();
+      const selection = await sdk?.base?.getSelection?.();
 
       const recordList = JSON.parse(
         localStorage.getItem("selectedRecords") || "[]"
       );
 
-      const res = (await getUserAnalysisPlan(userId)) as UserAnalysisPlanVO;
+      const res = (await getUserAnalysisPlan({
+        table_id: selection?.tableId,
+        view_id: selection?.viewId,
+      })) as UserAnalysisPlanVO;
 
       const table = await sdk.base.getTable(res.tableId);
       tableRef.current = table; // 保存 table 对象到 ref
@@ -1016,15 +1019,24 @@ const ProcessingPage: React.FC = () => {
     // 企业名称
     const name = getField("企业名称", "未知企业");
 
-    // 综合评分：将"高"、"中"、"低"转换为分数
-    const scoreText = getField("综合评分", "中");
+    // 综合评分：处理数字或文本评分
+    const scoreField = getField("综合评分", "50");
     let score = 50; // 默认中等分数
-    if (scoreText?.includes("高")) {
-      score = 85;
-    } else if (scoreText?.includes("中")) {
-      score = 65;
-    } else if (scoreText?.includes("低")) {
-      score = 45;
+
+    // 如果是数字，直接使用
+    const numericScore = parseFloat(scoreField);
+    if (!isNaN(numericScore)) {
+      score = numericScore;
+    } else {
+      // 如果是文本描述（高、中、低），转换为分数
+      const scoreText = String(scoreField).toLowerCase();
+      if (scoreText.includes("高")) {
+        score = 85;
+      } else if (scoreText.includes("中")) {
+        score = 65;
+      } else if (scoreText.includes("低")) {
+        score = 45;
+      }
     }
 
     // 融资轮次
@@ -1117,9 +1129,113 @@ const ProcessingPage: React.FC = () => {
     };
   };
 
+  // 将 AI 返回的 customerDoc（Markdown 格式）渲染成简单的 HTML
+  const escapeHtml = (str: string) =>
+    String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  const convertTableBlock = (rows: string[]) => {
+    if (rows.length === 0) return "";
+    const cells = (r: string) =>
+      r
+        .trim()
+        .replace(/^\||\|$/g, "")
+        .split("|")
+        .map((c) => c.trim());
+    const header = cells(rows[0]);
+    // 跳过可能的分隔行（---|---）
+    const bodyRows = rows.slice(1).filter((r) => !/^\s*\|?\s*-+\s*\|/.test(r));
+    let html = '<table class="doc-table"><thead><tr>';
+    header.forEach((h) => (html += `<th>${escapeHtml(h)}</th>`));
+    html += "</tr></thead><tbody>";
+    bodyRows.forEach((r) => {
+      const cols = cells(r);
+      html += "<tr>";
+      cols.forEach((c) => (html += `<td>${escapeHtml(c)}</td>`));
+      html += "</tr>";
+    });
+    html += "</tbody></table>";
+    return html;
+  };
+
+  const mdToHtml = (md: string) => {
+    if (!md) return "";
+    const lines = md.split(/\r?\n/);
+    let html = "";
+    let tableBuffer: string[] = [];
+
+    const flushTable = () => {
+      if (tableBuffer.length > 0) {
+        html += convertTableBlock(tableBuffer);
+        tableBuffer = [];
+      }
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim().startsWith("|")) {
+        tableBuffer.push(line);
+        continue;
+      }
+      flushTable();
+      if (line.startsWith("### ")) {
+        html += `<h3>${escapeHtml(line.replace(/^###\s+/, ""))}</h3>`;
+      } else if (line.startsWith("## ")) {
+        html += `<h2>${escapeHtml(line.replace(/^##\s+/, ""))}</h2>`;
+      } else if (line.startsWith("# ")) {
+        html += `<h1>${escapeHtml(line.replace(/^#\s+/, ""))}</h1>`;
+      } else if (line.trim() === "---") {
+        html += "<hr />";
+      } else if (line.trim() === "") {
+        html += "<p></p>";
+      } else {
+        // 普通段落，保留单行换行
+        html += `<p>${escapeHtml(line).replace(/\s{2}/g, "&nbsp;&nbsp;")}</p>`;
+      }
+    }
+    flushTable();
+    return html;
+  };
+
+  const renderCustomerDocToHtml = (doc: Record<string, any>) => {
+    if (!doc) return "";
+    const parts: string[] = [];
+    if (doc.title) {
+      parts.push(
+        `<div class=\"doc-title\"><h2>${escapeHtml(doc.title)}</h2></div>`
+      );
+    }
+    if (doc.header) {
+      parts.push(
+        `<div class=\"doc-header\"><strong>${escapeHtml(
+          doc.header
+        )}</strong></div>`
+      );
+    }
+
+    // 按 key 排序并渲染以保证 section_1..section_7 顺序
+    const sectionKeys = Object.keys(doc)
+      .filter((k) => k.startsWith("section_") || k.startsWith("section"))
+      .sort();
+
+    sectionKeys.forEach((key) => {
+      const content = String(doc[key] ?? "");
+      // 如果内容本身包含 markdown 标题或表格，走 mdToHtml
+      parts.push(`<div class=\"doc-section\">${mdToHtml(content)}</div>`);
+    });
+
+    // 组合并返回
+    return `<div class=\"customer-doc\">${parts.join("\n")}</div>`;
+  };
+
   const startProcessing = (data: DataDTO) => {
     let processedCount = 0;
     let currentRank = 1;
+    let tianYanChaCont = 0;
 
     // 设置总记录数
     const total = data.dataItems?.length || 20;
@@ -1132,6 +1248,7 @@ const ProcessingPage: React.FC = () => {
         try {
           // 解析 SSE 消息
           const parsedData = JSON.parse(eventData);
+          const totalRecords = data.dataItems?.length || 0;
 
           // 处理 REQUEST_ID 事件，获取任务 ID
           if (
@@ -1148,106 +1265,151 @@ const ProcessingPage: React.FC = () => {
             return; // REQUEST_ID 事件不需要继续处理
           }
 
-          // 检查是否有 field 数组
           if (
             parsedData &&
-            parsedData.data &&
-            Array.isArray(parsedData.data.fields)
+            (parsedData.event === "TIANYANCHA" ||
+              parsedData.event === "tianyancha" ||
+              parsedData.event === "ITEM_SUCCESS" ||
+              parsedData.event === "item_success")
           ) {
-            // 更新多维表格记录字段
-            if (parsedData.data.recordId && tableRef.current) {
-              updateRecordFields(
-                tableRef.current,
+            // 检查是否有 field 数组
+            if (
+              parsedData &&
+              parsedData.data &&
+              Array.isArray(parsedData.data.fields)
+            ) {
+              // 更新多维表格记录字段
+              if (parsedData.data.recordId && tableRef.current) {
+                updateRecordFields(
+                  tableRef.current,
+                  parsedData.data.recordId,
+                  parsedData.data.fields
+                ).catch((error) => {
+                  console.error("更新记录字段失败:", error);
+                });
+              }
+
+              // 转换为 Company 对象
+              const company = convertFieldsToCompany(
+                parsedData.data.fields,
+                currentRank,
                 parsedData.data.recordId,
-                parsedData.data.fields
-              ).catch((error) => {
-                console.error("更新记录字段失败:", error);
-              });
-            }
-
-            // 转换为 Company 对象
-            const company = convertFieldsToCompany(
-              parsedData.data.fields,
-              currentRank,
-              parsedData.data.recordId,
-              data.tableId
-            );
-
-            // 生成档案内容
-            company.archive = generateArchive(company.name, company.score);
-
-            // 更新状态
-            setFilteredData((prev) => {
-              // 检查是否已存在相同的 recordId
-              const existingIndex = prev.findIndex(
-                (item) => item.recordId === company.recordId
+                data.tableId
               );
 
-              if (existingIndex !== -1) {
-                // 如果存在，更新原有的 item 内容
-                const newData = [...prev];
-                newData[existingIndex] = company;
-                return newData;
-              } else {
-                // 如果不存在，添加新的 item
-                const newData = [...prev, company];
-                return newData;
+              // 生成档案内容：优先使用 SSE 返回的 customerDoc（markdown），否则使用默认的 generateArchive
+              try {
+                const customerDoc = parsedData?.data?.customerDoc;
+                if (
+                  customerDoc &&
+                  (customerDoc.title ||
+                    customerDoc.header ||
+                    Object.keys(customerDoc).length > 0)
+                ) {
+                  company.archive = renderCustomerDocToHtml(
+                    customerDoc as Record<string, any>
+                  );
+                } else {
+                  company.archive = generateArchive(
+                    company.name,
+                    company.score
+                  );
+                }
+              } catch (err) {
+                console.warn("渲染 customerDoc 失败，使用默认档案：", err);
+                company.archive = generateArchive(company.name, company.score);
               }
-            });
 
-            // 更新加载计数
-            processedCount++;
-            setLoadedCount(processedCount);
+              // 更新状态
+              setFilteredData((prev) => {
+                // 检查是否已存在相同的 recordId
+                const existingIndex = prev.findIndex(
+                  (item) => item.recordId === company.recordId
+                );
 
-            // 更新进度
-            const totalRecords = data.dataItems?.length || 20;
-            const progress = Math.min(
-              (processedCount / totalRecords) * 100,
-              100
-            );
+                if (existingIndex !== -1) {
+                  // 如果存在，更新原有的 item 内容
+                  const newData = [...prev];
+                  newData[existingIndex] = company;
+                  return newData;
+                } else {
+                  // 如果不存在，添加新的 item
+                  const newData = [...prev, company];
 
-            // 更新四个阶段的进度
-            const percent1 = Math.ceil((Math.min(processedCount, 5) / 5) * 100);
-            const percent2 = Math.ceil(
-              (Math.min(Math.max(processedCount - 5, 0), 5) / 5) * 100
-            );
-            const percent3 = Math.ceil(
-              (Math.min(Math.max(processedCount - 10, 0), 5) / 5) * 100
-            );
-            const percent4 = Math.ceil(
-              (Math.min(Math.max(processedCount - 15, 0), totalRecords - 15) /
-                (totalRecords - 15)) *
+                  return newData;
+                }
+              });
+
+              // 更新进度
+
+              // 更新四个阶段的进度
+              let percent1 = 0;
+              let percent2 = 0;
+              let percent3 = 0;
+              let percent4 = 0;
+
+              if (
+                parsedData.event === "TIANYANCHA" ||
+                parsedData.event === "tianyancha"
+              ) {
+                tianYanChaCont++;
+                percent1 = Math.min((tianYanChaCont / totalRecords) * 100, 100);
+              }
+
+              if (
+                parsedData.event === "ITEM_SUCCESS" ||
+                parsedData.event === "item_success"
+              ) {
+                processedCount++;
+                percent1 = 100;
+                percent2 = Math.min((processedCount / totalRecords) * 100, 100);
+                percent3 = Math.min((processedCount / totalRecords) * 100, 100);
+                percent4 = Math.min((processedCount / totalRecords) * 100, 100);
+                setLoadedCount(processedCount);
+              }
+
+              const progress = Math.min(
+                ((tianYanChaCont / totalRecords) * 0.5 +
+                  (processedCount / totalRecords) * 0.5) *
+                  100,
                 100
-            );
-            setProgressPercents({
-              p1: Math.min(percent1, 100),
-              p2: Math.min(percent2, 100),
-              p3: Math.min(percent3, 100),
-              p4: Math.min(percent4, 100),
-            });
-            setProgressWidth(progress);
+              );
 
-            // 设置档案加载状态
-            setArchiveLoadingStates((prev) => ({
-              ...prev,
-              [company.name]: true,
-            }));
-            setTimeout(() => {
+              setProgressPercents({
+                p1: Math.min(percent1, 100),
+                p2: Math.min(percent2, 100),
+                p3: Math.min(percent3, 100),
+                p4: Math.min(percent4, 100),
+              });
+              setProgressWidth(progress);
+
+              // 设置档案加载状态：如果 SSE 中包含 customerDoc，则标记为已就绪（不加载）；
+              // 如果没有 customerDoc，则保持 loading 状态，直到后续 SSE 带上 customerDoc 再置为 false
+              const hasCustomerDoc = !!(
+                parsedData &&
+                parsedData.data &&
+                parsedData.data.customerDoc
+              );
               setArchiveLoadingStates((prev) => ({
                 ...prev,
-                [company.name]: false,
+                [company.name]: !hasCustomerDoc,
               }));
-            }, Math.random() * 5000 + 2000);
 
-            // 更新排名
-            currentRank++;
+              // 更新排名
+              currentRank++;
+            } else {
+              console.warn("收到非标准格式的数据:", parsedData);
+            }
+          }
 
+          if (
+            parsedData &&
+            (parsedData.event === "COMPLETE" || parsedData.event === "complete")
+          ) {
             // 检查是否全部完成
             if (processedCount >= totalRecords) {
               finishLoading();
             }
-          } else {
-            console.warn("收到非标准格式的数据:", parsedData);
           }
         } catch (error) {
           console.error("解析 SSE 消息失败:", error, eventData);
@@ -1430,12 +1592,10 @@ const ProcessingPage: React.FC = () => {
   // 终止处理
   const handleTerminate = async () => {
     if (terminating) return;
-    // const params = new URLSearchParams(window.location.search);
-    // const id = params.get("id");
-    // if (!id) {
-    //   Toast.error("缺少任务 id，无法终止");
-    //   return;
-    // }
+    if (!requestId) {
+      Toast.error("缺少任务 id，无法终止");
+      return;
+    }
 
     Modal.confirm({
       title: "确认终止当前的分析任务吗？",
@@ -1471,10 +1631,6 @@ const ProcessingPage: React.FC = () => {
           // 重置进度为 100%
           setProgressPercents({ p1: 100, p2: 100, p3: 100, p4: 100 });
           setProgressWidth(100);
-
-          // 仅展示已完成的数据
-          setFilteredData((prev) => prev.slice(0, processedCount));
-          setCurrentPage(1);
 
           // 标记终止，停止后续自动推进
           setIsTerminated(true);
@@ -1555,6 +1711,7 @@ const ProcessingPage: React.FC = () => {
               className="btn-pause"
               id="pauseBtn"
               onClick={handlePauseToggle}
+              disabled={!isLoading}
               title={isPaused ? "点击继续恢复分析" : "点击暂停分析"}
             >
               {isPaused ? (
