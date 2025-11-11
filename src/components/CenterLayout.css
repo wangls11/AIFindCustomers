@@ -1,0 +1,56 @@
+/* CenterLayout 组件样式 */
+
+/* 基础居中布局 */
+.center-layout {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 错误状态特殊样式 */
+.center-layout--error {
+  padding: 0 20px;
+  text-align: center;
+}
+
+/* 加载文本样式 */
+.center-layout__loading-text {
+  color: #666;
+  font-size: 14px;
+}
+
+/* 错误标题样式 */
+.center-layout__error-title {
+  color: #f5222d;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* 错误消息样式 */
+.center-layout__error-message {
+  color: #666;
+  font-size: 14px;
+}
+
+/* 重新加载按钮样式 */
+.center-layout__reload-button {
+  padding: 8px 16px;
+  background-color: #1890ff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.center-layout__reload-button:hover {
+  background-color: #40a9ff;
+}
+
+.center-layout__reload-button:active {
+  background-color: #096dd9;
+}

@@ -1,4 +1,5 @@
 import { Toast } from "@douyinfe/semi-ui";
+import { getToken, checkAndHandleTokenExpired } from "./auth";
 
 // 定义响应数据类型
 interface ApiResponse<T = any> {
@@ -14,17 +15,13 @@ export interface RequestConfig extends RequestInit {
   headers?: HeadersInit;
   data?: any; // 请求体数据（兼容 axios 的 data 属性）
   baseURL?: string; // 基础 URL
+  url?: string; // 请求URL（用于拦截器中判断）
 }
 
 // 请求拦截器类型
-type RequestInterceptor = (
-  config: RequestConfig
-) => RequestConfig | Promise<RequestConfig>;
+type RequestInterceptor = (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
 // 响应拦截器类型
-type ResponseInterceptor<T = any> = (
-  response: Response,
-  data?: any
-) => any | Promise<any>;
+type ResponseInterceptor<T = any> = (response: Response, data?: any) => any | Promise<any>;
 // 错误拦截器类型
 type ErrorInterceptor = (error: any) => any | Promise<any>;
 
@@ -54,6 +51,25 @@ export const addResponseInterceptor = (interceptor: ResponseInterceptor) => {
   responseInterceptors.push(interceptor);
 };
 
+/**
+ * 不需要认证的接口白名单
+ * 这些接口在发送请求时不会添加Authorization头
+ */
+const AUTH_WHITELIST = [
+  "/api/user/login/login", // 登录接口
+];
+
+// 判断URL是否在白名单中
+function isInWhitelist(url = ""): boolean {
+  return AUTH_WHITELIST.some((pattern) => {
+    // 支持简单的字符串匹配
+    if (pattern.endsWith("*")) {
+      return url.startsWith(pattern.slice(0, -1));
+    }
+    return url === pattern;
+  });
+}
+
 // 添加错误拦截器
 export const addErrorInterceptor = (interceptor: ErrorInterceptor) => {
   errorInterceptors.push(interceptor);
@@ -61,37 +77,33 @@ export const addErrorInterceptor = (interceptor: ErrorInterceptor) => {
 
 // 默认请求拦截器
 const defaultRequestInterceptor: RequestInterceptor = (config) => {
-  // 添加认证头
   const headers = new Headers(config.headers || {});
-  headers.set("Authorization", `Bearer 9afd0857-5667-411d-af76-f5c9ddc1b870`);
+  const token = getToken();
 
-  // 开发环境打印日志（注意：url 在 request 函数中处理）
-  if (import.meta.env.DEV) {
-    console.log("Request:", config.method?.toUpperCase() || "GET");
+  // 白名单检查：只有非白名单接口才添加Authorization头
+  if (token && !isInWhitelist(config.url)) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
-  return {
-    ...config,
-    headers,
-  };
+  return { ...config, headers };
 };
 
 // 默认响应拦截器
-const defaultResponseInterceptor: ResponseInterceptor = async (
-  response,
-  data
-) => {
+const defaultResponseInterceptor: ResponseInterceptor = async (response, data) => {
   const res = data as ApiResponse;
 
-  // 根据实际接口返回的数据结构判断
+  // Token失效 (code: 4000) 的特殊处理
+  if (res.code === 4000) {
+    // 抛出带有特殊标识的错误，在请求函数中会被捕获并处理
+    const tokenExpiredError = new Error("Token已过期");
+    (tokenExpiredError as any).code = 4000;
+    (tokenExpiredError as any).originalResponse = res;
+    throw tokenExpiredError;
+  }
+
+  // 根据实际接口返回的数据结构判断（除了4000之外的其他错误）
   if (res.code !== 200) {
     Toast.error(res.message || "请求失败");
-
-    // 根据不同的错误码做不同处理
-    if (res.code === 401) {
-      // 未授权，可以跳转到登录页
-      // window.location.href = '/login';
-    }
 
     throw new Error(res.message || "失败");
   }
@@ -102,8 +114,6 @@ const defaultResponseInterceptor: ResponseInterceptor = async (
 
 // 默认错误拦截器
 const defaultErrorInterceptor: ErrorInterceptor = (error) => {
-  console.error("Response Error:", error);
-
   let message = "网络错误，请稍后重试";
 
   if (error instanceof Response) {
@@ -114,7 +124,6 @@ const defaultErrorInterceptor: ErrorInterceptor = (error) => {
         break;
       case 401:
         message = "未授权，请重新登录";
-        // window.location.href = '/login';
         break;
       case 403:
         message = "拒绝访问";
@@ -145,16 +154,12 @@ const defaultErrorInterceptor: ErrorInterceptor = (error) => {
     // 检查 error.reason (现代浏览器支持)
     const errorReason = abortError.reason;
     const reasonMessage =
-      errorReason?.message ||
-      (typeof errorReason === "string" ? errorReason : "") ||
-      "";
+      errorReason?.message || (typeof errorReason === "string" ? errorReason : "") || "";
 
     // 检查 signal.reason (如果 error 有 signal 属性)
     const signalReason = abortError.signal?.reason;
     const signalReasonMessage =
-      signalReason?.message ||
-      (typeof signalReason === "string" ? signalReason : "") ||
-      "";
+      signalReason?.message || (typeof signalReason === "string" ? signalReason : "") || "";
 
     // 检查 error.cause (Error 构造函数支持)
     const errorCause = (error as Error).cause;
@@ -166,25 +171,18 @@ const defaultErrorInterceptor: ErrorInterceptor = (error) => {
         : "") || "";
 
     // 检查所有可能包含 timeout 的地方
-    const allMessages = [
-      errorMessage,
-      reasonMessage,
-      signalReasonMessage,
-      causeMessage,
-    ].map((m) => String(m).toLowerCase());
+    const allMessages = [errorMessage, reasonMessage, signalReasonMessage, causeMessage].map((m) =>
+      String(m).toLowerCase(),
+    );
 
     const isTimeout = allMessages.some((m) => m.includes("timeout"));
 
     // 特殊处理: "BodyStreamBuffer was aborted" 如果找不到明确的取消原因，
     // 且配置了超时，很可能是超时导致的
-    const isBodyStreamAborted = errorMessage.includes(
-      "BodyStreamBuffer was aborted"
-    );
+    const isBodyStreamAborted = errorMessage.includes("BodyStreamBuffer was aborted");
     const likelyTimeout =
       isBodyStreamAborted &&
-      !allMessages.some(
-        (m) => m.includes("cancelled") || m.includes("cancel")
-      ) &&
+      !allMessages.some((m) => m.includes("cancelled") || m.includes("cancel")) &&
       defaultConfig.timeout &&
       defaultConfig.timeout > 0;
 
@@ -207,11 +205,7 @@ addResponseInterceptor(defaultResponseInterceptor);
 addErrorInterceptor(defaultErrorInterceptor);
 
 // 构建完整 URL
-const buildURL = (
-  url: string,
-  params?: Record<string, any>,
-  baseURL?: string
-): string => {
+const buildURL = (url: string, params?: Record<string, any>, baseURL?: string): string => {
   let fullURL = url;
 
   // 添加 baseURL
@@ -262,11 +256,7 @@ const processBody = (data: any, headers: Headers): BodyInit | null => {
     return JSON.stringify(data);
   }
 
-  if (
-    data instanceof FormData ||
-    data instanceof Blob ||
-    data instanceof ArrayBuffer
-  ) {
+  if (data instanceof FormData || data instanceof Blob || data instanceof ArrayBuffer) {
     return data;
   }
 
@@ -282,15 +272,14 @@ const createTimeoutController = (timeout: number): AbortController => {
 };
 
 // 核心请求函数
-const request = async <T = any>(
-  url: string,
-  config: RequestConfig = {}
-): Promise<T> => {
-  try {
+const request = async <T = any>(url: string, config: RequestConfig = {}): Promise<T> => {
+  // 内部执行实际网络请求的函数
+  const performRequest = async (): Promise<T> => {
     // 合并配置
     const mergedConfig: RequestConfig = {
       ...defaultConfig,
       ...config,
+      url, // 添加url到配置中，供拦截器使用
       headers: {
         ...defaultConfig.headers,
         ...config.headers,
@@ -304,26 +293,16 @@ const request = async <T = any>(
     }
 
     // 构建 URL
-    const fullURL = buildURL(
-      url,
-      finalConfig.params,
-      finalConfig.baseURL as string
-    );
+    const fullURL = buildURL(url, finalConfig.params, finalConfig.baseURL as string);
 
     // 处理请求体
     const headers = new Headers(finalConfig.headers);
-    const body = processBody(
-      (finalConfig as any).data || finalConfig.body,
-      headers
-    );
+    const body = processBody((finalConfig as any).data || finalConfig.body, headers);
 
     // 创建 AbortController（支持超时和手动取消）
     const timeoutController = finalConfig.timeout
       ? createTimeoutController(finalConfig.timeout)
       : null;
-    const userController = finalConfig.signal
-      ? { signal: finalConfig.signal }
-      : {};
 
     // 合并 signal（如果两者都存在，需要创建一个新的 AbortController）
     let signal = finalConfig.signal;
@@ -331,14 +310,13 @@ const request = async <T = any>(
       const combinedController = new AbortController();
       timeoutController.signal.addEventListener("abort", () =>
         combinedController.abort(
-          (timeoutController.signal as any).reason ||
-            new Error("Request timeout")
-        )
+          (timeoutController.signal as any).reason || new Error("Request timeout"),
+        ),
       );
       finalConfig.signal.addEventListener("abort", () =>
         combinedController.abort(
-          (finalConfig.signal as any)?.reason || new Error("Request cancelled")
-        )
+          (finalConfig.signal as any)?.reason || new Error("Request cancelled"),
+        ),
       );
       signal = combinedController.signal;
     } else if (timeoutController) {
@@ -404,22 +382,18 @@ const request = async <T = any>(
     }
 
     return result;
+  };
+
+  try {
+    return await performRequest();
   } catch (error) {
-    // 执行错误拦截器
-    let finalError = error;
-    for (const interceptor of errorInterceptors) {
-      finalError = await interceptor(finalError);
-    }
-    throw finalError;
+    // 检查是否是token过期错误，并处理
+    return await checkAndHandleTokenExpired(error, performRequest);
   }
 };
 
 // 导出常用的请求方法
-export const get = <T = any>(
-  url: string,
-  params?: any,
-  config?: RequestConfig
-): Promise<T> => {
+export const get = <T = any>(url: string, params?: any, config?: RequestConfig): Promise<T> => {
   return request<T>(url, {
     ...config,
     method: "GET",
@@ -427,11 +401,7 @@ export const get = <T = any>(
   });
 };
 
-export const post = <T = any>(
-  url: string,
-  data?: any,
-  config?: RequestConfig
-): Promise<T> => {
+export const post = <T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> => {
   return request<T>(url, {
     ...config,
     method: "POST",
@@ -439,11 +409,7 @@ export const post = <T = any>(
   });
 };
 
-export const put = <T = any>(
-  url: string,
-  data?: any,
-  config?: RequestConfig
-): Promise<T> => {
+export const put = <T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> => {
   return request<T>(url, {
     ...config,
     method: "PUT",
@@ -451,10 +417,7 @@ export const put = <T = any>(
   });
 };
 
-export const del = <T = any>(
-  url: string,
-  config?: RequestConfig
-): Promise<T> => {
+export const del = <T = any>(url: string, config?: RequestConfig): Promise<T> => {
   return request<T>(url, {
     ...config,
     method: "DELETE",
@@ -479,10 +442,7 @@ export interface StreamRequestConfig extends RequestConfig {
  * @param config 请求配置，包括 onMessage、onError、onComplete 回调
  * @returns AbortController 用于取消请求
  */
-export const stream = (
-  url: string,
-  config: StreamRequestConfig = {}
-): AbortController => {
+export const stream = (url: string, config: StreamRequestConfig = {}): AbortController => {
   const controller = new AbortController();
 
   (async () => {
@@ -506,18 +466,11 @@ export const stream = (
       }
 
       // 构建 URL
-      const fullURL = buildURL(
-        url,
-        finalConfig.params,
-        finalConfig.baseURL as string
-      );
+      const fullURL = buildURL(url, finalConfig.params, finalConfig.baseURL as string);
 
       // 处理请求体
       const headers = new Headers(finalConfig.headers);
-      const body = processBody(
-        (finalConfig as any).data || finalConfig.body,
-        headers
-      );
+      const body = processBody((finalConfig as any).data || finalConfig.body, headers);
 
       // 合并 signal
       const timeoutController = finalConfig.timeout
@@ -529,20 +482,15 @@ export const stream = (
         const combinedController = new AbortController();
         timeoutController.signal.addEventListener("abort", () =>
           combinedController.abort(
-            (timeoutController!.signal as any).reason ||
-              new Error("Request timeout")
-          )
+            (timeoutController!.signal as any).reason || new Error("Request timeout"),
+          ),
         );
         controller.signal.addEventListener("abort", () =>
           combinedController.abort(
-            (controller.signal as any).reason || new Error("Request cancelled")
-          )
+            (controller.signal as any).reason || new Error("Request cancelled"),
+          ),
         );
         signal = combinedController.signal;
-      }
-
-      if (import.meta.env.DEV) {
-        console.log("[SSE] 开始请求:", fullURL);
       }
 
       // 发起请求
@@ -554,39 +502,20 @@ export const stream = (
         signal,
       });
 
-      if (import.meta.env.DEV) {
-        console.log("[SSE] 收到响应:", response.status, response.statusText);
-        console.log(
-          "[SSE] Content-Type:",
-          response.headers.get("content-type")
-        );
-      }
-
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
-        throw new Error(
-          `HTTP ${response.status}: ${errorText || response.statusText}`
-        );
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
       }
 
       // 检查 Content-Type
       const contentType = response.headers.get("content-type") || "";
-      if (
-        !contentType.includes("text/event-stream") &&
-        !contentType.includes("text/plain")
-      ) {
-        if (import.meta.env.DEV) {
-          console.warn(`[SSE] 意外的 Content-Type: ${contentType}`);
-        }
+      if (!contentType.includes("text/event-stream") && !contentType.includes("text/plain")) {
+        console.warn(`[SSE] 意外的 Content-Type: ${contentType}`);
       }
 
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error("SSE 流不可用：response.body 为 null");
-      }
-
-      if (import.meta.env.DEV) {
-        console.log("[SSE] 开始读取流");
       }
 
       const decoder = new TextDecoder("utf-8");
@@ -598,17 +527,8 @@ export const stream = (
         readCount++;
 
         if (done) {
-          if (import.meta.env.DEV) {
-            console.log(`[SSE] 流结束，共读取 ${readCount} 次`);
-          }
           // 处理缓冲区中剩余的数据
           if (buffer.trim()) {
-            if (import.meta.env.DEV) {
-              console.log(
-                "[SSE] 处理缓冲区剩余数据:",
-                buffer.substring(0, 100)
-              );
-            }
             const lines = buffer.split(/\r?\n/);
             const dataLines = lines
               .filter((l) => l.startsWith("data:"))
@@ -643,40 +563,23 @@ export const stream = (
             if (dataLines.length) {
               // 合并多行 data（如果有多行）
               const dataPayload = dataLines.join("\n");
-              if (import.meta.env.DEV) {
-                console.log("[SSE] 解析到数据:", dataPayload.substring(0, 100));
-              }
+
               try {
                 config.onMessage?.(dataPayload);
               } catch (msgErr) {
-                console.error("[SSE] onMessage 回调出错:", msgErr);
                 config.onError?.(msgErr);
               }
             } else {
               // 如果没有 data: 行，记录原始事件内容（用于调试）
-              if (import.meta.env.DEV) {
-                console.log(
-                  "[SSE] 未找到 data: 行，原始事件:",
-                  rawEvent.substring(0, 200)
-                );
-              }
             }
-          }
-        } else {
-          if (import.meta.env.DEV) {
-            console.warn("[SSE] 读取到空的 value");
           }
         }
       }
     } catch (err) {
       // 如果是 AbortError，可能是用户主动取消，不一定要调用 onError
       if (err instanceof Error && err.name === "AbortError") {
-        if (import.meta.env.DEV) {
-          console.log("SSE 流已取消");
-        }
         return;
       }
-      console.error("SSE 流错误:", err);
       config.onError?.(err);
     }
   })();

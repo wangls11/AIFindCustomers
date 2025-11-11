@@ -1,6 +1,28 @@
 import { post } from "@/utils/request";
 import type { ResultVO } from "./types";
 
+// 登录参数接口
+export interface LoginParams {
+  open_id: string;
+  tenant_key: string;
+}
+
+// 登录响应接口
+export interface LoginResponse {
+  tokenValue: string;
+}
+
+/**
+ * 登录
+ * @param {object} params LoginParams
+ * @param {string} params.open_id
+ * @param {string} params.tenant_key
+ * @returns Promise<LoginResponse>
+ */
+export function login(params: LoginParams) {
+  return post<LoginResponse>(`/api/user/login/login`, params);
+}
+
 export interface UserAnalysisPlanDTO {
   id?: string;
   userId?: string; // 用户id
@@ -51,15 +73,11 @@ export function saveUserAnalysisPlan(dto: UserAnalysisPlanDTO) {
     }
   });
 
-  return post<ResultVO<UserAnalysisPlanDTO>>(
-    "/api/user/userAnalysisPlan/save",
-    params,
-    {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    }
-  );
+  return post<ResultVO<UserAnalysisPlanDTO>>("/api/user/userAnalysisPlan/save", params, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
 }
 
 /**
@@ -68,18 +86,14 @@ export function saveUserAnalysisPlan(dto: UserAnalysisPlanDTO) {
  * Content-Type: application/x-www-form-urlencoded
  * 请求参数：userId (string)
  */
-export function getUserAnalysisPlan({table_id, view_id}: {table_id: string; view_id: string}) {
+export function getUserAnalysisPlan({ table_id, view_id }: { table_id: string; view_id: string }) {
   const params = new URLSearchParams();
   params.append("table_id", table_id);
   params.append("view_id", view_id);
 
-  return post<ResultVO<UserAnalysisPlanVO>>(
-    "/api/user/userAnalysisPlan/get",
-    params,
-    {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    }
-  );
+  return post<ResultVO<UserAnalysisPlanVO>>("/api/user/userAnalysisPlan/get", params, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
 }
