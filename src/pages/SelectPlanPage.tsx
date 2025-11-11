@@ -2,7 +2,11 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import "./SelectPlanPage.css";
 import { bitable } from "@lark-base-open/js-sdk";
-import { saveUserAnalysisPlan } from "@/api";
+import {
+  getUserAnalysisPlan,
+  saveUserAnalysisPlan,
+  UserAnalysisPlanVO,
+} from "@/api";
 
 type AppState = {
   selectedTable: string | null;
@@ -83,6 +87,7 @@ const SelectPlanPage: React.FC = () => {
   const [loadingFields, setLoadingFields] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [planId, setPlanId] = useState<string>("");
 
   const valuePropOptions = [
     "成本降低",
@@ -122,11 +127,24 @@ const SelectPlanPage: React.FC = () => {
     }
   };
 
+  const fetchUserAnalysisPlan = async (tableId: string, viewId: string) => {
+    const res = (await getUserAnalysisPlan({
+      table_id: tableId,
+      view_id: viewId,
+    })) as UserAnalysisPlanVO;
+    console.log(res);
+
+    if (res) {
+      setPlanId(res.id || "");
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
         const sdk: any = bitable ?? (window as any).bitable;
         const selection = await sdk?.base?.getSelection?.();
+        fetchUserAnalysisPlan(selection?.tableId, selection?.viewId);
         const currentTableId = selection?.tableId ?? null;
         if (currentTableId) {
           setState((prev) => ({ ...prev, selectedTable: currentTableId }));
@@ -416,6 +434,7 @@ const SelectPlanPage: React.FC = () => {
 
       await saveUserAnalysisPlan({
         userId,
+        id: planId,
         tableId: state.selectedTable,
         viewId: state.selectedView,
         fieldList: JSON.stringify(state.selectedFields),

@@ -64,6 +64,27 @@ export function abortData(id: string) {
 }
 
 /**
+ * 继续数据处理
+ * @param id 任务id
+ * @returns 是否成功
+ */
+export function continueData(
+  id: string,
+  onMessage: SseMessageHandler,
+  onError?: SseErrorHandler
+) {
+  return stream("/api/data/resume", {
+    method: "POST",
+    data: { id },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    onMessage,
+    onError,
+  });
+}
+
+/**
  * 检验是否可恢复/继续
  * POST /api/data/checkResume
  * Content-Type: application/x-www-form-urlencoded
