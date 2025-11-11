@@ -31,265 +31,6 @@ type Company = {
   tableId?: string;
 };
 
-const companiesData: Company[] = [
-  {
-    rank: 1,
-    name: "海康威视",
-    score: 92,
-    financing: "A轮",
-    employees: "50-99人",
-    founded: "2021年1月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "融资强", type: "positive" },
-      { text: "客户多", type: "positive" },
-      { text: "产品新", type: "positive" },
-      { text: "风险低", type: "positive" },
-    ],
-  },
-  {
-    rank: 2,
-    name: "腾讯控股",
-    score: 88,
-    financing: "已上市",
-    employees: "10000+人",
-    founded: "1998年11月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "全面优秀", type: "positive" },
-      { text: "战略清晰", type: "positive" },
-      { text: "采购能力强", type: "positive" },
-    ],
-  },
-  {
-    rank: 3,
-    name: "网易",
-    score: 78,
-    financing: "已上市",
-    employees: "5000-9999人",
-    founded: "2000年6月",
-    completeness: "部分",
-    risk: "低风险",
-    tags: [
-      { text: "创新强", type: "positive" },
-      { text: "市场认可", type: "positive" },
-      { text: "数据缺失", type: "warning" },
-    ],
-  },
-  {
-    rank: 4,
-    name: "字节跳动",
-    score: 72,
-    financing: "C轮",
-    employees: "5000-9999人",
-    founded: "2012年3月",
-    completeness: "部分",
-    risk: "中风险",
-    tags: [
-      { text: "产品多元", type: "positive" },
-      { text: "融资强", type: "positive" },
-      { text: "数据缺失", type: "warning" },
-    ],
-  },
-  {
-    rank: 5,
-    name: "小米集团",
-    score: 68,
-    financing: "已上市",
-    employees: "10000+人",
-    founded: "2010年4月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "融资完成", type: "positive" },
-      { text: "团队大", type: "positive" },
-      { text: "风险低", type: "positive" },
-    ],
-  },
-  {
-    rank: 6,
-    name: "阿里巴巴",
-    score: 65,
-    financing: "已上市",
-    employees: "10000+人",
-    founded: "1999年9月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "全球企业", type: "positive" },
-      { text: "融资充足", type: "positive" },
-      { text: "产品多", type: "positive" },
-    ],
-  },
-  {
-    rank: 7,
-    name: "B站",
-    score: 62,
-    financing: "已上市",
-    employees: "1000-4999人",
-    founded: "2010年6月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "创新平台", type: "positive" },
-      { text: "社区强", type: "positive" },
-      { text: "潜力股", type: "positive" },
-    ],
-  },
-  {
-    rank: 8,
-    name: "快手",
-    score: 58,
-    financing: "D轮",
-    employees: "1000-4999人",
-    founded: "2011年3月",
-    completeness: "部分",
-    risk: "低风险",
-    tags: [
-      { text: "短视频", type: "positive" },
-      { text: "融资强", type: "positive" },
-      { text: "数据不全", type: "warning" },
-    ],
-  },
-  {
-    rank: 9,
-    name: "滴滴出行",
-    score: 55,
-    financing: "私募",
-    employees: "5000-9999人",
-    founded: "2012年9月",
-    completeness: "完整",
-    risk: "中风险",
-    tags: [
-      { text: "平台型", type: "positive" },
-      { text: "融资多", type: "positive" },
-      { text: "政策风险", type: "warning" },
-    ],
-  },
-  {
-    rank: 10,
-    name: "美团",
-    score: 52,
-    financing: "已上市",
-    employees: "5000-9999人",
-    founded: "2010年3月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "多业务", type: "positive" },
-      { text: "融资充足", type: "positive" },
-      { text: "稳健", type: "positive" },
-    ],
-  },
-  {
-    rank: 11,
-    name: "蚂蚁集团",
-    score: 48,
-    financing: "私募",
-    employees: "1000-4999人",
-    founded: "2004年",
-    completeness: "部分",
-    risk: "高风险",
-    tags: [
-      { text: "金融科技", type: "positive" },
-      { text: "数据缺失", type: "warning" },
-      { text: "政策风险", type: "danger" },
-    ],
-  },
-  {
-    rank: 12,
-    name: "旷视科技",
-    score: 45,
-    financing: "C轮",
-    employees: "500-999人",
-    founded: "2011年10月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "AI专家", type: "positive" },
-      { text: "融资充足", type: "positive" },
-      { text: "技术强", type: "positive" },
-    ],
-  },
-  {
-    rank: 13,
-    name: "商汤科技",
-    score: 42,
-    financing: "C轮",
-    employees: "500-999人",
-    founded: "2014年4月",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "AI领军", type: "positive" },
-      { text: "融资强", type: "positive" },
-      { text: "技术领先", type: "positive" },
-    ],
-  },
-  {
-    rank: 14,
-    name: "拼多多",
-    score: 38,
-    financing: "已上市",
-    employees: "1000-4999人",
-    founded: "2015年9月",
-    completeness: "完整",
-    risk: "中风险",
-    tags: [
-      { text: "增速快", type: "positive" },
-      { text: "融资多", type: "positive" },
-      { text: "竞争激烈", type: "warning" },
-    ],
-  },
-  {
-    rank: 15,
-    name: "知乎",
-    score: 35,
-    financing: "已上市",
-    employees: "500-999人",
-    founded: "2010年12月",
-    completeness: "部分",
-    risk: "中风险",
-    tags: [
-      { text: "知识平台", type: "positive" },
-      { text: "社区强", type: "positive" },
-      { text: "数据缺失", type: "warning" },
-    ],
-  },
-  {
-    rank: 16,
-    name: "大疆创新",
-    score: 32,
-    financing: "私募",
-    employees: "1000-4999人",
-    founded: "2006年",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "硬件企业", type: "positive" },
-      { text: "融资多", type: "positive" },
-      { text: "全球布局", type: "positive" },
-    ],
-  },
-  {
-    rank: 17,
-    name: "顺丰速运",
-    score: 28,
-    financing: "已上市",
-    employees: "10000+人",
-    founded: "1993年",
-    completeness: "完整",
-    risk: "低风险",
-    tags: [
-      { text: "物流龙头", type: "positive" },
-      { text: "融资完成", type: "positive" },
-      { text: "稳健运营", type: "positive" },
-    ],
-  },
-];
-
 // 定义字段数组
 const fieldsToAdd = [
   {
@@ -908,7 +649,7 @@ const ProcessingPage: React.FC = () => {
 
     // 综合评分：处理数字或文本评分
     const scoreField = getField("综合评分", "50");
-    let score = 50; // 默认中等分数
+    let score = -1; // 默认中等分数
 
     // 如果是数字，直接使用
     const numericScore = parseFloat(scoreField);
@@ -976,30 +717,27 @@ const ProcessingPage: React.FC = () => {
     }
 
     // 生成标签
-    const tags: Tag[] = [];
+    // 只展示两个 tag：融资热度 和 增长热度，格式为 "字段名称：字段的值"
     const financingHeat = getField("融资热度", "");
     const growthHeat = getField("增长热度", "");
-    const riskRating = getField("风险评级", "");
 
-    if (financingHeat.includes("高")) {
-      tags.push({ text: "融资强", type: "positive" });
-    }
-    if (growthHeat.includes("高")) {
-      tags.push({ text: "增长快", type: "positive" });
-    }
-    if (riskRating.includes("低")) {
-      tags.push({ text: "风险低", type: "positive" });
-    } else if (riskRating.includes("高")) {
-      tags.push({ text: "风险高", type: "danger" });
-    }
-    if (completeness === "部分") {
-      tags.push({ text: "数据缺失", type: "warning" });
-    }
+    const tags: Tag[] = [];
 
-    // 如果没有标签，添加一些默认标签
-    if (tags.length === 0) {
-      tags.push({ text: "企业信息", type: "positive" });
-    }
+    const makeType = (val: string) => {
+      if (!val) return "warning" as const;
+      if (val.includes("高")) return "positive" as const;
+      if (val.includes("低")) return "danger" as const;
+      return "warning" as const;
+    };
+
+    tags.push({
+      text: `融资热度：${financingHeat || "未知"}`,
+      type: makeType(financingHeat),
+    });
+    tags.push({
+      text: `增长热度：${growthHeat || "未知"}`,
+      type: makeType(growthHeat),
+    });
 
     return {
       rank,
@@ -2055,6 +1793,14 @@ const ProcessingPage: React.FC = () => {
             const stars = getStars(company.score);
             const isArchiveLoading = archiveLoadingStates[company.name];
             const isDisabled = archiveLoadingStates.isDocDisabled;
+            // 当分数或标签尚未生成时，显示加载态（与“查看客户档案”按钮一致）
+            const isScoreLoading =
+              company.score === -1 ||
+              company.score === undefined ||
+              !!isArchiveLoading;
+
+            const isTagsLoading =
+              !company.tags || company.tags.length === 0 || !!isArchiveLoading;
             return (
               <div
                 key={company.name}
@@ -2065,16 +1811,32 @@ const ProcessingPage: React.FC = () => {
                   <div className="card-top">
                     <div className="company-name">{company.name}</div>
                     <div className="score-badge">
-                      <span className="score-value">{company.score}分</span>
-                      {/* <span className="score-stars">{stars}</span> */}
+                      {isScoreLoading ? (
+                        <div style={{ display: "flex" }}>
+                          <span className={`stage-status  loading`}>⟳</span>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="score-value">{company.score}分</span>
+                          {/* <span className="score-stars">{stars}</span> */}
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="card-tags">
-                    {company.tags.map((tag, i) => (
-                      <span key={i} className={`tag ${tag.type}`}>
-                        ✓{tag.text}
-                      </span>
-                    ))}
+                    {isTagsLoading ? (
+                      // 与档案加载按钮一致的视觉样式（简洁占位）
+                      <span className={`stage-status  loading`}>⟳</span>
+                    ) : (
+                      company.tags.map((tag, i) => (
+                        <React.Fragment key={i}>
+                          {i > 0 && (
+                            <span className="tag-sep" aria-hidden="true" />
+                          )}
+                          <span className={`tag1 ${tag.type}`}>{tag.text}</span>
+                        </React.Fragment>
+                      ))
+                    )}
                   </div>
                   <div className="card-meta">
                     <span>{company.financing}</span>
@@ -2101,7 +1863,7 @@ const ProcessingPage: React.FC = () => {
                   >
                     {isArchiveLoading && !isDisabled ? (
                       <>
-                        <span className="loading-spinner">⏳</span>
+                        <span className={`stage-status  loading`}>⟳</span>
                         <span className="btn-text">加载中...</span>
                       </>
                     ) : (

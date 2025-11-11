@@ -4,13 +4,15 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   width: 100%;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   background: #f5f7fa;
   color: #333;
 }
@@ -195,8 +197,12 @@ body {
   border-radius: 1px;
 }
 
-.icon-pause::before { left: 0; }
-.icon-pause::after { right: 0; }
+.icon-pause::before {
+  left: 0;
+}
+.icon-pause::after {
+  right: 0;
+}
 
 .icon-play {
   width: 0;
@@ -324,8 +330,12 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .stage-name {
@@ -489,9 +499,14 @@ body {
   }
 }
 
-.company-card:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+.company-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .card-top {
@@ -544,8 +559,89 @@ body {
   color: #666;
 }
 
+/* 中间的两项指标（融资热度、增长热度） */
+.card-indicators {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #444;
+}
+.indicator .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.indicator .dot.positive {
+  background: #10b981; /* green */
+}
+.indicator .dot.warning {
+  background: #f59e0b; /* yellow */
+}
+.indicator .dot.danger {
+  background: #ef4444; /* red */
+}
+.indicator-text {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 分数下的等级标签 */
+.score-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.score-level .level-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.score-level.level-high {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+.score-level.level-high .level-dot {
+  background: #10b981;
+}
+.score-level.level-good {
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+}
+.score-level.level-good .level-dot {
+  background: #4f46e5;
+}
+.score-level.level-mid {
+  background: rgba(245, 158, 11, 0.08);
+  color: #d97706;
+}
+.score-level.level-mid .level-dot {
+  background: #f59e0b;
+}
+.score-level.level-low {
+  background: rgba(239, 68, 68, 0.06);
+  color: #dc2626;
+}
+.score-level.level-low .level-dot {
+  background: #ef4444;
+}
+
 .card-tags {
-  display: inline-flex; /* 宽度跟随内容 */
+  display: flex; /* 占满整行以便居中 */
+  width: 100%;
   gap: 8px;
   margin-bottom: 8px;
   align-items: center;
@@ -554,28 +650,38 @@ body {
   overflow: visible; /* 不裁剪内容 */
 }
 
-.tag {
+/* 隐藏卡片内可能出现的滚动条（加载占位、分数、标签）
+   保持内容可见但不显示滚动条，移动端会在 media query 中处理 */
+.card-tags,
+.score-badge,
+.score-loading {
+  overflow: hidden !important;
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.card-tags::-webkit-scrollbar,
+.score-badge::-webkit-scrollbar,
+.score-loading::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.tag1 {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 4px 0px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap; /* 避免内部换行 */
 }
 
-.tag.positive {
-  background: #d1fae5;
-  color: #059669;
-}
-
-.tag.warning {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.tag.danger {
-  background: #fee2e2;
-  color: #dc2626;
+.tag-sep {
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  background: #d1d5db; /* subtle gray box */
+  border-radius: 2px;
+  margin: 0 8px;
+  vertical-align: middle;
 }
 
 .card-buttons {
@@ -820,7 +926,7 @@ body {
 }
 
 .list-item::before {
-  content: '✓';
+  content: "✓";
   position: absolute;
   left: 0;
   color: #10b981;
@@ -895,5 +1001,3 @@ body {
     flex-wrap: wrap;
   }
 }
-
-

@@ -16,10 +16,9 @@ const AiZhaoKe: React.FC = () => {
         const table = await bitable.base.getActiveTable();
         const fields = await table.getFieldMetaList();
         const companyField = fields.find(
-          (field: any) => field.name === "公司名称"
+          (field: any) => field.name === "企业名称"
         );
         if (!companyField) {
-          console.error("未找到名为'公司名称'的字段");
           setCompanyList([]);
           return;
         }
@@ -46,7 +45,6 @@ const AiZhaoKe: React.FC = () => {
           .filter((item: { name: string }) => item.name);
         setCompanyList(companyNames);
       } catch (e) {
-        console.error("获取公司名称失败", e);
         setCompanyList([]);
       }
     }

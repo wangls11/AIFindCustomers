@@ -285,7 +285,18 @@ const SelectPlanPage: React.FC = () => {
         if (!table) return;
         let fieldMetas: any[] = [];
         if (typeof table.getFieldMetaList === "function") {
-          fieldMetas = await table.getFieldMetaList();
+          const view = await table.getActiveView();
+
+          fieldMetas = await view.getFieldMetaList();
+
+          const compony = fieldMetas.find((m: any) => m.name === "企业名称");
+
+          if (compony) {
+            setState((prev) => {
+              setFieldCount(1);
+              return { ...prev, selectedFields: [compony.id] };
+            });
+          }
         } else if (typeof table.getFieldList === "function") {
           const fieldInstances = await table.getFieldList();
           fieldMetas = await Promise.all(
@@ -573,7 +584,11 @@ const SelectPlanPage: React.FC = () => {
                   <input
                     type="checkbox"
                     value={field.id}
-                    checked={state.selectedFields.includes(field.id)}
+                    checked={
+                      state.selectedFields.includes(field.id) ||
+                      field.name === "企业名称"
+                    }
+                    disabled={field.name === "企业名称"}
                     onChange={() => toggleField(field.id)}
                   />
                   <span className="checkbox-label">{field.name}</span>
