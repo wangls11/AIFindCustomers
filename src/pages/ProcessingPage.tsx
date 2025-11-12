@@ -13,6 +13,7 @@ import {
 } from "@/api";
 import "./ProcessingPage.css";
 import { bitable, FieldType } from "@lark-base-open/js-sdk";
+import AnalysisCompleteModal from "../components/AnalysisCompleteModal";
 
 // ==================== 数据 ====================
 type Tag = { text: string; type: "positive" | "warning" | "danger" };
@@ -121,6 +122,7 @@ const ProcessingPage: React.FC = () => {
   const [loadedCount, setLoadedCount] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0); // 总记录数，默认为 20
   const [isLoading, setIsLoading] = useState(true);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [terminating, setTerminating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isTerminated, setIsTerminated] = useState(false);
@@ -157,6 +159,7 @@ const ProcessingPage: React.FC = () => {
   const tableRef = useRef<any>(null);
   const requestIdRef = useRef<string | null>(null);
   const { state } = useLocation();
+  const [isSuccessVisible, setIsSuccessVisible] = useState(false);
 
   // 记录总数
   const recordAllCount = useRef<number>(0);
@@ -1333,6 +1336,8 @@ const ProcessingPage: React.FC = () => {
 
   const finishLoading = () => {
     setIsLoading(false);
+    setIsSuccess(true);
+    setIsSuccessVisible(true);
     // 使用函数式更新，确保使用最新的 filteredData
     setFilteredData((prev) => {
       const sorted = [...prev].sort((a, b) => b.score - a.score);
@@ -1566,8 +1571,46 @@ const ProcessingPage: React.FC = () => {
     { label: "按成立时间", value: "founded" },
   ];
 
+  /**
+   * 统计不同评分等级的公司数量
+   * @param companies
+   * @returns
+   */
+  const countByScoreLevel = (
+    companies: Company[]
+  ): {
+    excellent: number;
+    potential: number;
+    watch: number;
+    low: number;
+  } => {
+    const result = {
+      excellent: 0, // >= 90
+      potential: 0, // 80–89
+      watch: 0, // 70–79
+      low: 0, // < 70
+    };
+
+    for (const company of companies) {
+      const score = company.score;
+
+      if (score >= 90) result.excellent++;
+      else if (score >= 80) result.potential++;
+      else if (score >= 70) result.watch++;
+      else result.low++;
+    }
+
+    return result;
+  };
+
   return (
     <div className={`container ${isPaused ? "paused" : ""}`}>
+      {/* Modal is added but hidden by default (visible=false) to avoid changing current behavior */}
+      <AnalysisCompleteModal
+        visible={isSuccessVisible}
+        data={countByScoreLevel(filteredData)}
+        tableName={tableName}
+      />
       <div className="progress-header">
         <div className="progress-title">
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1580,75 +1623,139 @@ const ProcessingPage: React.FC = () => {
             <span id="completedCount">{loadedCount}</span>/{totalRecords} 完成
           </span>
         </div>
-        <div className="progress-info">
-          <div className="info-left">
-            <span id="statusText">
-              {isLoading ? (
-                isPaused ? (
-                  "已暂停"
+        {!isSuccess ? (
+          <div className="progress-info">
+            <div className="info-left">
+              <span id="statusText">
+                {isLoading ? (
+                  isPaused ? (
+                    "已暂停"
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <span className="stage-status loading">⟳</span>{" "}
+                      AI找客全力分析中！
+                    </div>
+                  )
                 ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <span className="stage-status loading">⟳</span>{" "}
-                    AI找客全力分析中！
-                  </div>
-                )
-              ) : (
-                "分析完成"
-              )}
-            </span>
+                  "分析完成"
+                )}
+              </span>
+            </div>
+            <div className="info-right">
+              <span id="timeText">
+                {isLoading
+                  ? isPaused
+                    ? "暂停中"
+                    : "预计 30 秒完成"
+                  : "已完成"}
+              </span>
+            </div>
           </div>
-          <div className="info-right">
-            <span id="timeText">
-              {isLoading ? (isPaused ? "暂停中" : "预计 30 秒完成") : "已完成"}
-            </span>
-          </div>
-        </div>
+        ) : null}
       </div>
 
       <div className="companies-container" ref={containerRef}>
         {isPaused && <div className="paused-overlay"></div>}
         <div style={{ padding: "16px 24px" }}>
-          <div className="progress-controls">
-            <button
-              className="btn-pause"
-              id="pauseBtn"
-              onClick={handlePauseToggle}
-              disabled={!isLoading}
-              title={isPaused ? "点击继续恢复分析" : "点击暂停分析"}
-            >
-              {isPaused ? (
-                <>
-                  <span className="icon-play" aria-hidden="true"></span>
-                  <span className="sr-only">继续</span>
-                </>
-              ) : (
-                <>
-                  <span className="icon-pause" aria-hidden="true"></span>
-                  <span className="sr-only">暂停</span>
-                </>
-              )}
-            </button>
-            <button
-              className="btn-stop"
-              id="stopBtn"
-              onClick={handleTerminate}
-              disabled={terminating || !isLoading}
-            >
-              <span
-                className={`icon-stop${terminating ? " spinning" : ""}`}
-                aria-hidden="true"
-              ></span>
-              <span className="sr-only">
-                {terminating ? "正在终止" : "终止"}
-              </span>
-            </button>
-          </div>
+          {!isSuccess ? (
+            <div className="progress-controls">
+              <button
+                className="btn-pause"
+                id="pauseBtn"
+                onClick={handlePauseToggle}
+                disabled={!isLoading}
+                title={isPaused ? "点击继续恢复分析" : "点击暂停分析"}
+              >
+                {isPaused ? (
+                  <>
+                    <span className="icon-play" aria-hidden="true"></span>
+                    <span className="sr-only">继续</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="icon-pause" aria-hidden="true"></span>
+                    <span className="sr-only">暂停</span>
+                  </>
+                )}
+              </button>
+              <button
+                className="btn-stop"
+                id="stopBtn"
+                onClick={handleTerminate}
+                disabled={terminating || !isLoading}
+              >
+                <span
+                  className={`icon-stop${terminating ? " spinning" : ""}`}
+                  aria-hidden="true"
+                ></span>
+                <span className="sr-only">
+                  {terminating ? "正在终止" : "终止"}
+                </span>
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginBottom: "16px" }}>
+              <div
+                style={{
+                  marginBottom: "16px",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#10b981",
+                    marginRight: "8px",
+                  }}
+                >
+                  ✓
+                </span>
+                <span style={{ color: "#666666" }}>
+                  分析完成，{tableName || "AI找客"} · {totalRecords}家企业
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontWeight: 600, marginRight: "4px" }}>
+                    {countByScoreLevel(filteredData).excellent}家
+                  </span>
+                  <span style={{ color: "#666666" }}>优质客户</span>
+                </div>
+                <div className="tag-sep"></div>
+                <div>
+                  <span>
+                    <span style={{ fontWeight: 600, marginRight: "4px" }}>
+                      {countByScoreLevel(filteredData).potential}家
+                    </span>
+                  </span>
+                  <span style={{ color: "#666666" }}>潜力客户</span>
+                </div>
+                <div className="tag-sep"></div>
+                <div>
+                  <span>
+                    <span style={{ fontWeight: 600, marginRight: "4px" }}>
+                      {countByScoreLevel(filteredData).watch}家
+                    </span>
+                  </span>
+                  <span style={{ color: "#666666" }}>观察名单</span>
+                </div>
+                <div className="tag-sep"></div>
+                <div>
+                  <span>
+                    <span style={{ fontWeight: 600, marginRight: "4px" }}>
+                      {countByScoreLevel(filteredData).low}家
+                    </span>
+                  </span>
+                  <span style={{ color: "#666666" }}>低分客户</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="progress-bar">
             <div
               className="progress-bar-fill"
