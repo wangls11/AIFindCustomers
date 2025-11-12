@@ -6,6 +6,7 @@ import SelectPlanPage from "../pages/SelectPlanPage";
 import ProcessingPage from "../pages/ProcessingPage";
 import CompletePage from "../pages/CompletePage";
 import BuyCreditsPage from "../pages/BuyCreditsPage";
+import HistoryAnalysisPage from "@/pages/HistoryAnalysisPage";
 
 const router = createBrowserRouter([
   {
@@ -32,6 +33,10 @@ const router = createBrowserRouter([
       {
         path: "buy-credits",
         element: <BuyCreditsPage />,
+      },
+      {
+        path: "history",
+        element: <HistoryAnalysisPage />,
       },
     ],
   },

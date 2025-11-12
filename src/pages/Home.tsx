@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import "./Home.css";
 import { bitable } from "@lark-base-open/js-sdk";
+import MenuButtonWithDropdown from "../components/MenuButtonWithDropdown";
 
 const AiZhaoKe: React.FC = () => {
   const [count, setCount] = useState(0);
@@ -103,9 +104,7 @@ const AiZhaoKe: React.FC = () => {
             AI找客
           </div>
         </div>
-        <button className="icon" aria-label="菜单">
-          ☰
-        </button>
+        <MenuButtonWithDropdown />
       </header>
 
       <main className="wrap">
