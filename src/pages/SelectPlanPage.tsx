@@ -7,6 +7,7 @@ import {
   saveUserAnalysisPlan,
   UserAnalysisPlanVO,
 } from "@/api";
+import MenuButtonWithDropdown from "@/components/MenuButtonWithDropdown";
 
 type AppState = {
   selectedTable: string | null;
@@ -498,7 +499,9 @@ const SelectPlanPage: React.FC = () => {
           ←
         </button>
         <div className="header-title">分析我的客户</div>
-        <div className="spacer"></div>
+        <div className="spacer">
+          <MenuButtonWithDropdown />
+        </div>
       </header>
 
       <main className="wrap">

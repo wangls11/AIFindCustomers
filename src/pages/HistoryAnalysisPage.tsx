@@ -1,85 +1,70 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router";
+import { getRequest, UserRequest } from "@/api/history";
+import "./HistoryAnalysisPage.css";
 
 const HistoryAnalysisPage = () => {
-  // 初始化会话数据
-  const [sessions, setSessions] = useState([
-    {
-      id: 1,
-      name: "客户线索总表 - 11/12",
-      status: "processing",
-      progress: 15,
-      total: 100,
-      startTime: "2025-11-12 10:30:15",
-      pauseTime: null,
-      completeTime: null,
-    },
-    {
-      id: 2,
-      name: "客户线索总表 - 11/11",
-      status: "paused",
-      progress: 30,
-      total: 100,
-      startTime: "2025-11-11 13:20:30",
-      pauseTime: "2025-11-11 15:18:45",
-      completeTime: null,
-    },
-    {
-      id: 3,
-      name: "新客户线索 - 11/10",
-      status: "paused",
-      progress: 20,
-      total: 50,
-      startTime: "2025-11-10 14:00:20",
-      pauseTime: "2025-11-10 14:30:50",
-      completeTime: null,
-    },
-    {
-      id: 4,
-      name: "季度分析 - 11/08",
-      status: "paused",
-      progress: 40,
-      total: 80,
-      startTime: "2025-11-08 15:30:10",
-      pauseTime: "2025-11-08 16:00:30",
-      completeTime: null,
-    },
-    {
-      id: 5,
-      name: "新客户线索·10月批次",
-      status: "completed",
-      progress: 20,
-      total: 20,
-      startTime: "2025-11-08 09:00:10",
-      pauseTime: null,
-      completeTime: "2025-11-08 09:15:20",
-    },
-    {
-      id: 6,
-      name: "客户线索总表 - 11/4",
-      status: "completed",
-      progress: 30,
-      total: 30,
-      startTime: "2025-11-04 09:00:00",
-      pauseTime: null,
-      completeTime: "2025-11-04 09:20:00",
-    },
-    {
-      id: 7,
-      name: "季度客户分析 - 10/28",
-      status: "completed",
-      progress: 50,
-      total: 50,
-      startTime: "2025-10-28 14:00:00",
-      pauseTime: null,
-      completeTime: "2025-10-28 14:30:00",
-    },
-  ]);
+  const navigate = useNavigate();
 
-  const [currentFilter, setCurrentFilter] = useState("processing");
-  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+  // ======================== State ========================
+  type Session = {
+    id: number | string;
+    name: string;
+    status: "0" | "1" | "2" | string;
+    progress: number;
+    total: number;
+    startTime?: string | null;
+    pauseTime?: string | null;
+    completeTime?: string | null;
+  };
+
+  // store sessions separately per status so each tab has its own list and pagination
+  const [sessionsMap, setSessionsMap] = useState<Record<string, Session[]>>({
+    "0": [],
+    "1": [],
+    "2": [],
+  });
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({
+    "0": false,
+    "1": false,
+    "2": false,
+  });
+  const [isLoadingMoreMap, setIsLoadingMoreMap] = useState<
+    Record<string, boolean>
+  >({
+    "0": false,
+    "1": false,
+    "2": false,
+  });
+  const [pageMap, setPageMap] = useState<Record<string, number>>({
+    "0": 1,
+    "1": 1,
+    "2": 1,
+  });
+  const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({
+    "0": true,
+    "1": true,
+    "2": true,
+  });
+  const [totalsMap, setTotalsMap] = useState<Record<string, number>>({
+    "0": 0,
+    "1": 0,
+    "2": 0,
+  });
+
+  const [error, setError] = useState<string | null>(null);
+  const [currentFilter, setCurrentFilter] = useState("0");
+  const [activeMenuId, setActiveMenuId] = useState<number | string | null>(
+    null
+  );
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<
+    number | string | null
+  >(null);
+  const [currentSessionStatus, setCurrentSessionStatus] = useState<
+    string | null
+  >(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteSessionInfo, setDeleteSessionInfo] = useState({
     name: "",
@@ -88,116 +73,249 @@ const HistoryAnalysisPage = () => {
 
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 筛选会话
-  const filteredSessions = sessions.filter((s) => s.status === currentFilter);
+  // 分页状态
+  // (moved to per-status maps)
 
-  // 计数
-  const processingCount = sessions.filter(
-    (s) => s.status === "processing"
-  ).length;
-  const pausedCount = sessions.filter((s) => s.status === "paused").length;
-  const completedCount = sessions.filter(
-    (s) => s.status === "completed"
-  ).length;
+  // ======================== Derived ========================
+  const filteredSessions = sessionsMap[currentFilter] || [];
+  // use backend totals when available for tab labels
+  const processingCount = totalsMap["0"] ?? sessionsMap["0"].length;
+  const pausedCount = totalsMap["1"] ?? sessionsMap["1"].length;
+  const completedCount = totalsMap["2"] ?? sessionsMap["2"].length;
 
-  // 自动聚焦重命名输入框
+  // ======================== Hooks ========================
   useEffect(() => {
-    const input = renameInputRef.current;
-    if (showRenameModal && input) {
+    if (showRenameModal && renameInputRef.current) {
       setTimeout(() => {
-        input.focus();
-        input.select();
+        renameInputRef.current?.focus();
+        renameInputRef.current?.select();
       }, 100);
     }
   }, [showRenameModal]);
 
-  // 点击页面关闭菜单
   useEffect(() => {
-    const handleClickOutside = () => {
-      setActiveMenuId(null);
-    };
-
+    const handleClickOutside = () => setActiveMenuId(null);
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  // 打开会话
-  const openSession = (id: number, status: string) => {
-    console.log("打开会话:", id, "状态:", status);
-    // 跳转到 Page 3
+  // ======================== Helper ========================
+  const mapUserRequestToSession = (r: UserRequest) => {
+    const id =
+      r.id ?? (r.sessionId as any) ?? Math.random().toString(36).slice(2);
+    let name = `会话 ${id}`;
+
+    try {
+      if (r.param) {
+        if (typeof r.param === "string") {
+          const parsed = JSON.parse(r.param as string);
+          if (parsed && (parsed.name || parsed.title))
+            name = parsed.name || parsed.title;
+        } else if (typeof r.param === "object" && (r.param as any).name) {
+          name = (r.param as any).name;
+        }
+      } else if ((r as any).map && (r as any).map.name) {
+        name = (r as any).map.name;
+      }
+    } catch {}
+
+    const total = Number(r.totalCount ?? 0) || 0;
+    const progress = Number(r.successCount ?? 0) || 0;
+
+    const rawStatus = (r.status || "").toString().toLowerCase();
+    let status: "0" | "1" | "2" | string = "0";
+    if (rawStatus.includes("pause") || rawStatus.includes("paused"))
+      status = "1";
+    else if (
+      rawStatus.includes("complete") ||
+      rawStatus.includes("done") ||
+      rawStatus.includes("success")
+    )
+      status = "2";
+    else status = "0";
+
+    const startTime = r.createTime ?? null;
+    const completeTime =
+      status === "2" ? r.updateTime ?? r.createTime ?? null : null;
+    const pauseTime = status === "1" ? r.updateTime ?? null : null;
+
+    return {
+      id,
+      name,
+      status,
+      progress,
+      total,
+      startTime,
+      pauseTime,
+      completeTime,
+    };
   };
 
-  // 筛选会话
+  // ======================== Fetch ========================
+  const fetchSessions = async (filter = currentFilter, page = 1) => {
+    setError(null);
+
+    // set loading flags per status
+    if (page === 1) {
+      setLoadingMap((prev) => ({ ...prev, [filter]: true }));
+    } else {
+      setIsLoadingMoreMap((prev) => ({ ...prev, [filter]: true }));
+    }
+
+    try {
+      const payload = {
+        pageNO: page,
+        pageSize: 5,
+        type: filter,
+      };
+
+      const res = await getRequest(payload as any);
+      const pageData = res?.data ?? res;
+      const list: UserRequest[] = pageData?.dataList || [];
+      const mapped = (list || []).map(mapUserRequestToSession);
+
+      // total returned by backend for this query
+      const totalFromApi = Number(pageData?.total ?? 0) || 0;
+      setTotalsMap((t) => ({ ...t, [filter]: totalFromApi }));
+
+      if (page === 1) {
+        setSessionsMap((prev) => ({ ...prev, [filter]: mapped }));
+        setPageMap((p) => ({ ...p, [filter]: 1 }));
+      } else {
+        setSessionsMap((prev) => ({
+          ...prev,
+          [filter]: [...(prev[filter] || []), ...mapped],
+        }));
+        setPageMap((p) => ({ ...p, [filter]: page }));
+      }
+
+      if (!list.length || list.length < payload.pageSize) {
+        setHasMoreMap((m) => ({ ...m, [filter]: false }));
+      } else {
+        setHasMoreMap((m) => ({ ...m, [filter]: true }));
+      }
+    } catch (err: any) {
+      console.error("fetchSessions error:", err);
+      setError(err?.message || String(err));
+    } finally {
+      setLoadingMap((prev) => ({ ...prev, [filter]: false }));
+      setIsLoadingMoreMap((prev) => ({ ...prev, [filter]: false }));
+    }
+  };
+
+  // fetch first page for all three statuses when filter changes or on mount so counts are available
+  useEffect(() => {
+    // initial load for all tabs so counts are displayed immediately
+    fetchSessions("0", 1);
+    fetchSessions("1", 1);
+    fetchSessions("2", 1);
+
+    // keep behavior of switching to a tab: we already have first page, but if it's empty we let fetch handle it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 滚动加载更多
+  useEffect(() => {
+    const handleScroll = () => {
+      const filter = currentFilter;
+      if (
+        window.innerHeight + window.scrollY >=
+          document.body.offsetHeight - 200 &&
+        (hasMoreMap[filter] ?? false) &&
+        !(isLoadingMoreMap[filter] ?? false) &&
+        !(loadingMap[filter] ?? false)
+      ) {
+        const nextPage = (pageMap[filter] ?? 1) + 1;
+        setPageMap((p) => ({ ...p, [filter]: nextPage }));
+        fetchSessions(filter, nextPage);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [pageMap, hasMoreMap, isLoadingMoreMap, loadingMap, currentFilter]);
+
+  // ======================== Actions ========================
+  const goBack = () => navigate(-1);
+  const startNewAnalysis = () => console.log("开始新分析");
+  const openSession = (id: number | string, status: string) => {
+    console.log("打开会话:", id, "状态:", status);
+  };
+
   const filterSessions = (type: string) => {
     setCurrentFilter(type);
-    console.log("筛选类型:", type);
+    // Only fetch when we don't already have data for that tab.
+    // Avoid resetting pagination here to prevent duplicate fetches/append.
+    if (!sessionsMap[type] || sessionsMap[type].length === 0) {
+      fetchSessions(type, 1);
+    }
   };
 
-  // 切换菜单
-  const toggleMenu = (e: React.MouseEvent<HTMLElement>, id: number) => {
+  const toggleMenu = (
+    e: React.MouseEvent<HTMLElement>,
+    id: number | string
+  ) => {
     e.stopPropagation();
     setActiveMenuId(activeMenuId === id ? null : id);
   };
 
-  // 返回
-  const goBack = () => {
-    console.log("返回上一页");
-  };
-
-  // 新建分析
-  const startNewAnalysis = () => {
-    console.log("开始新分析");
-  };
-
-  // 打开重命名弹窗
   const openRenameModal = (
     e: React.MouseEvent<HTMLElement>,
-    id: number,
-    currentName: string
+    id: number | string,
+    currentName: string,
+    status: string
   ) => {
     e.stopPropagation();
     setCurrentSessionId(id);
+    setCurrentSessionStatus(status);
     setRenameValue(currentName);
     setShowRenameModal(true);
     setActiveMenuId(null);
   };
 
-  // 关闭重命名弹窗
   const closeRenameModal = () => {
     setShowRenameModal(false);
     setCurrentSessionId(null);
   };
 
-  // 保存重命名
   const saveRename = () => {
     const newName = renameValue.trim();
-    if (!newName) {
-      alert("名称不能为空");
-      return;
+    if (!newName) return alert("名称不能为空");
+    // update the correct status list
+    const status = currentSessionStatus;
+    if (status) {
+      setSessionsMap((prev) => ({
+        ...prev,
+        [status]: (prev[status] || []).map((session) =>
+          session.id === currentSessionId
+            ? { ...session, name: newName }
+            : session
+        ),
+      }));
+    } else {
+      // fallback: update across all lists
+      setSessionsMap((prev) => {
+        const next: Record<string, Session[]> = { ...prev };
+        Object.keys(next).forEach((k) => {
+          next[k] = next[k].map((s) =>
+            s.id === currentSessionId ? { ...s, name: newName } : s
+          );
+        });
+        return next;
+      });
     }
-
-    console.log("重命名会话", currentSessionId, "为:", newName);
-
-    setSessions((prevSessions) =>
-      prevSessions.map((session) =>
-        session.id === currentSessionId
-          ? { ...session, name: newName }
-          : session
-      )
-    );
-
     closeRenameModal();
   };
 
-  // 打开删除确认弹窗
   const openDeleteModal = (
     e: React.MouseEvent<HTMLElement>,
-    id: number,
+    id: number | string,
     name: string,
-    progress: string
+    progress: string,
+    status: string
   ) => {
     e.stopPropagation();
     setCurrentSessionId(id);
+    setCurrentSessionStatus(status);
     setDeleteSessionInfo({
       name: name,
       progress: progress + " 已完成",
@@ -206,447 +324,52 @@ const HistoryAnalysisPage = () => {
     setActiveMenuId(null);
   };
 
-  // 关闭删除弹窗
   const closeDeleteModal = () => {
     setShowDeleteModal(false);
     setCurrentSessionId(null);
   };
 
-  // 确认删除
   const confirmDelete = () => {
-    console.log("删除会话:", currentSessionId);
-
-    setSessions((prevSessions) =>
-      prevSessions.filter((session) => session.id !== currentSessionId)
-    );
-
+    // remove from the correct status list
+    const status = currentSessionStatus;
+    if (status) {
+      setSessionsMap((prev) => ({
+        ...prev,
+        [status]: (prev[status] || []).filter(
+          (session) => session.id !== currentSessionId
+        ),
+      }));
+    } else {
+      setSessionsMap((prev) => {
+        const next: Record<string, Session[]> = { ...prev };
+        Object.keys(next).forEach((k) => {
+          next[k] = next[k].filter((s) => s.id !== currentSessionId);
+        });
+        return next;
+      });
+    }
     closeDeleteModal();
   };
 
-  // 回车键保存重命名
   const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      saveRename();
-    }
+    if (e.key === "Enter") saveRename();
   };
 
-  // 点击遮罩关闭弹窗
   const handleModalOverlayClick = (
     e: React.MouseEvent<HTMLElement>,
     modalType: string
   ) => {
     const target = e.target as HTMLElement;
     if (target.id === modalType) {
-      if (modalType === "renameModal") {
-        closeRenameModal();
-      } else if (modalType === "deleteModal") {
-        closeDeleteModal();
-      }
+      if (modalType === "renameModal") closeRenameModal();
+      else if (modalType === "deleteModal") closeDeleteModal();
     }
   };
 
+  // ======================== Render ========================
   return (
     <>
-      <style>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-          background: #f5f5f5;
-        }
-
-        .container {
-          margin: 0 auto;
-          background: white;
-          min-height: 100vh;
-        }
-
-        /* 顶部导航栏 */
-        .header {
-          padding: 16px 20px;
-          background: white;
-          border-bottom: 1px solid #f0f0f0;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          position: sticky;
-          top: 0;
-          z-index: 100;
-        }
-
-        .header-left {
-          display: flex;
-          align-items: center;
-        }
-
-        .back-btn {
-          font-size: 18px;
-          margin-right: 12px;
-          color: #333;
-          cursor: pointer;
-        }
-
-        .header-title {
-          font-size: 16px;
-          font-weight: 500;
-          color: #333;
-        }
-
-        .new-analysis-btn {
-          padding: 8px 16px;
-          background: #1890ff;
-          border: none;
-          border-radius: 6px;
-          color: white;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .new-analysis-btn:hover {
-          background: #40a9ff;
-        }
-
-        .new-analysis-btn:disabled {
-          background: #d9d9d9;
-          cursor: not-allowed;
-        }
-
-        /* 统计区域 */
-        .stats-section {
-          padding: 20px;
-          background: #fafafa;
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        .stats-title {
-          font-size: 14px;
-          font-weight: 500;
-          color: #333;
-          margin-bottom: 12px;
-        }
-
-        .stats-item {
-          font-size: 13px;
-          color: #666;
-          line-height: 1.8;
-        }
-
-        .stats-number {
-          font-weight: 600;
-          color: #1890ff;
-        }
-
-        /* 筛选标签栏 */
-        .filter-tabs {
-          display: flex;
-          padding: 0 20px;
-          background: white;
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        .filter-tab {
-          flex: 1;
-          padding: 14px 0;
-          text-align: center;
-          font-size: 14px;
-          color: #666;
-          cursor: pointer;
-          position: relative;
-          transition: all 0.2s ease;
-          border-bottom: 2px solid transparent;
-        }
-
-        .filter-tab:hover {
-          color: #1890ff;
-        }
-
-        .filter-tab.active {
-          color: #1890ff;
-          border-bottom-color: #1890ff;
-        }
-
-        .filter-tab .tab-count {
-          margin-left: 4px;
-          font-size: 12px;
-          color: #999;
-        }
-
-        .filter-tab.active .tab-count {
-          color: #1890ff;
-        }
-
-        /* 列表内容 */
-        .content {
-          padding: 16px;
-        }
-
-        /* 会话卡片 */
-        .session-card {
-          background: white;
-          border: 1px solid #e8e8e8;
-          border-radius: 8px;
-          padding: 16px;
-          margin-bottom: 12px;
-          transition: all 0.2s ease;
-          position: relative;
-          cursor: pointer;
-        }
-
-        .session-card:hover {
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-          border-color: #1890ff;
-        }
-
-        /* 进行中会话呼吸动效 */
-        .session-card.processing {
-          animation: breathingCard 3s ease-in-out infinite;
-        }
-
-        @keyframes breathingCard {
-          0%, 100% {
-            border-color: #e8e8e8;
-            box-shadow: 0 0 0 rgba(82, 196, 26, 0);
-          }
-          50% {
-            border-color: rgba(82, 196, 26, 0.6);
-            box-shadow: 0 0 12px rgba(82, 196, 26, 0.3);
-          }
-        }
-
-        /* 卡片头部 */
-        .card-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          margin-bottom: 12px;
-        }
-
-        .session-name {
-          flex: 1;
-          font-size: 15px;
-          font-weight: 500;
-          color: #333;
-          line-height: 1.4;
-          word-break: break-word;
-        }
-
-        .more-btn {
-          padding: 4px 8px;
-          background: transparent;
-          border: none;
-          font-size: 18px;
-          color: #999;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          flex-shrink: 0;
-          margin-left: 12px;
-          z-index: 2;
-        }
-
-        .more-btn:hover {
-          color: #333;
-        }
-
-        /* 卡片信息 */
-        .card-info {
-          margin-bottom: 0;
-        }
-
-        .info-item {
-          font-size: 13px;
-          color: #666;
-          line-height: 1.8;
-          display: flex;
-          align-items: center;
-        }
-
-        .info-icon {
-          margin-right: 6px;
-          font-size: 14px;
-        }
-
-        /* 下拉菜单 */
-        .dropdown-menu {
-          position: absolute;
-          top: 40px;
-          right: 16px;
-          background: white;
-          border: 1px solid #e8e8e8;
-          border-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-          min-width: 140px;
-          z-index: 10;
-          display: none;
-        }
-
-        .dropdown-menu.show {
-          display: block;
-        }
-
-        .menu-item {
-          padding: 12px 16px;
-          font-size: 14px;
-          color: #333;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
-        }
-
-        .menu-item:hover {
-          background: #f5f5f5;
-        }
-
-        .menu-item:first-child {
-          border-radius: 8px 8px 0 0;
-        }
-
-        .menu-item:last-child {
-          border-radius: 0 0 8px 8px;
-        }
-
-        .menu-item.danger {
-          color: #ff4d4f;
-        }
-
-        .menu-item.danger:hover {
-          background: #fff1f0;
-        }
-
-        .menu-icon {
-          margin-right: 8px;
-          font-size: 16px;
-        }
-
-        /* 弹窗遮罩 */
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          display: none;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-
-        .modal-overlay.show {
-          display: flex;
-        }
-
-        /* 重命名弹窗 */
-        .modal {
-          width: 90%;
-          max-width: 400px;
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-        }
-
-        .modal-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: #333;
-          margin-bottom: 16px;
-        }
-
-        .modal-input {
-          width: 100%;
-          height: 40px;
-          padding: 0 12px;
-          border: 1px solid #d9d9d9;
-          border-radius: 6px;
-          font-size: 14px;
-          margin-bottom: 20px;
-        }
-
-        .modal-input:focus {
-          outline: none;
-          border-color: #1890ff;
-        }
-
-        .modal-actions {
-          display: flex;
-          gap: 10px;
-        }
-
-        .modal-btn {
-          flex: 1;
-          height: 40px;
-          border: 1px solid #d9d9d9;
-          background: white;
-          border-radius: 6px;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .modal-btn:hover {
-          border-color: #1890ff;
-          color: #1890ff;
-        }
-
-        .modal-btn.primary {
-          background: #1890ff;
-          border-color: #1890ff;
-          color: white;
-        }
-
-        .modal-btn.primary:hover {
-          background: #40a9ff;
-        }
-
-        /* 删除确认弹窗 */
-        .delete-modal {
-          width: 90%;
-          max-width: 400px;
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-        }
-
-        .delete-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: #333;
-          margin-bottom: 12px;
-        }
-
-        .delete-content {
-          margin-bottom: 16px;
-        }
-
-        .delete-session-name {
-          font-size: 14px;
-          color: #666;
-          margin-bottom: 8px;
-        }
-
-        .delete-warning {
-          font-size: 13px;
-          color: #ff4d4f;
-          line-height: 1.6;
-        }
-
-        .modal-btn.danger {
-          background: #ff4d4f;
-          border-color: #ff4d4f;
-          color: white;
-        }
-
-        .modal-btn.danger:hover {
-          background: #ff7875;
-        }
-      `}</style>
-
-      <div className="container">
+      <div className="containerHistory">
         {/* 顶部导航 */}
         <div className="header">
           <div className="header-left">
@@ -674,26 +397,20 @@ const HistoryAnalysisPage = () => {
         {/* 筛选标签栏 */}
         <div className="filter-tabs">
           <div
-            className={`filter-tab ${
-              currentFilter === "processing" ? "active" : ""
-            }`}
-            onClick={() => filterSessions("processing")}
+            className={`filter-tab ${currentFilter === "0" ? "active" : ""}`}
+            onClick={() => filterSessions("0")}
           >
             进行中<span className="tab-count">({processingCount})</span>
           </div>
           <div
-            className={`filter-tab ${
-              currentFilter === "paused" ? "active" : ""
-            }`}
-            onClick={() => filterSessions("paused")}
+            className={`filter-tab ${currentFilter === "1" ? "active" : ""}`}
+            onClick={() => filterSessions("1")}
           >
             暂停<span className="tab-count">({pausedCount})</span>
           </div>
           <div
-            className={`filter-tab ${
-              currentFilter === "completed" ? "active" : ""
-            }`}
-            onClick={() => filterSessions("completed")}
+            className={`filter-tab ${currentFilter === "2" ? "active" : ""}`}
+            onClick={() => filterSessions("2")}
           >
             已完成<span className="tab-count">({completedCount})</span>
           </div>
@@ -701,77 +418,102 @@ const HistoryAnalysisPage = () => {
 
         {/* 列表内容 */}
         <div className="content">
-          {filteredSessions.map((session) => (
-            <div
-              key={session.id}
-              className={`session-card ${
-                session.status === "processing" ? "processing" : ""
-              }`}
-              onClick={() => openSession(session.id, session.status)}
-            >
-              <div className="card-header">
-                <div className="session-name">{session.name}</div>
-                <button
-                  className="more-btn"
-                  onClick={(e) => toggleMenu(e, session.id)}
-                >
-                  ⋯
-                </button>
+          {loadingMap[currentFilter] ? (
+            <div style={{ padding: 20, color: "#666" }}>加载中...</div>
+          ) : error ? (
+            <div style={{ padding: 20, color: "#ff4d4f" }}>错误：{error}</div>
+          ) : filteredSessions.length === 0 ? (
+            <div style={{ padding: 20, color: "#999" }}>暂无数据</div>
+          ) : (
+            <>
+              {filteredSessions.map((session) => (
                 <div
-                  className={`dropdown-menu ${
-                    activeMenuId === session.id ? "show" : ""
+                  key={session.id}
+                  className={`session-card ${
+                    session.status === "0" ? "processing" : ""
                   }`}
+                  onClick={() => openSession(session.id, session.status)}
                 >
-                  <div
-                    className="menu-item"
-                    onClick={(e) =>
-                      openRenameModal(e, session.id, session.name)
-                    }
-                  >
-                    <span className="menu-icon">✏️</span>
-                    重命名
+                  <div className="card-header">
+                    <div className="session-name">{session.name}</div>
+                    <button
+                      className="more-btn"
+                      onClick={(e) => toggleMenu(e, session.id)}
+                    >
+                      ⋯
+                    </button>
+                    <div
+                      className={`dropdown-menu ${
+                        activeMenuId === session.id ? "show" : ""
+                      }`}
+                    >
+                      <div
+                        className="menu-item"
+                        onClick={(e) =>
+                          openRenameModal(
+                            e,
+                            session.id,
+                            session.name,
+                            session.status
+                          )
+                        }
+                      >
+                        <span className="menu-icon">✏️</span>重命名
+                      </div>
+                      <div
+                        className="menu-item danger"
+                        onClick={(e) =>
+                          openDeleteModal(
+                            e,
+                            session.id,
+                            session.name,
+                            `${session.progress}/${session.total}`,
+                            session.status
+                          )
+                        }
+                      >
+                        <span className="menu-icon">🗑️</span>删除会话
+                      </div>
+                    </div>
                   </div>
-                  <div
-                    className="menu-item danger"
-                    onClick={(e) =>
-                      openDeleteModal(
-                        e,
-                        session.id,
-                        session.name,
-                        `${session.progress}/${session.total}`
-                      )
-                    }
-                  >
-                    <span className="menu-icon">🗑️</span>
-                    删除会话
-                  </div>
-                </div>
-              </div>
 
-              <div className="card-info">
-                <div className="info-item">
-                  <span className="info-icon">📊</span>
-                  进度：{session.progress}/{session.total}
-                </div>
-                <div className="info-item">
-                  <span className="info-icon">⏰</span>
-                  开始于：{session.startTime}
-                </div>
-                {session.pauseTime && (
-                  <div className="info-item">
-                    <span className="info-icon">⏸️</span>
-                    暂停于：{session.pauseTime}
+                  <div className="card-info">
+                    <div className="info-item">
+                      <span className="info-icon">📊</span>进度：
+                      {session.progress}/{session.total}
+                    </div>
+                    <div className="info-item">
+                      <span className="info-icon">⏰</span>开始于：
+                      {session.startTime}
+                    </div>
+                    {session.pauseTime && (
+                      <div className="info-item">
+                        <span className="info-icon">⏸️</span>暂停于：
+                        {session.pauseTime}
+                      </div>
+                    )}
+                    {session.completeTime && (
+                      <div className="info-item">
+                        <span className="info-icon">✅</span>完成于：
+                        {session.completeTime}
+                      </div>
+                    )}
                   </div>
-                )}
-                {session.completeTime && (
-                  <div className="info-item">
-                    <span className="info-icon">✅</span>
-                    完成于：{session.completeTime}
-                  </div>
-                )}
+                </div>
+              ))}
+
+              {/* 底部加载提示 */}
+              <div
+                style={{ textAlign: "center", padding: "12px", color: "#999" }}
+              >
+                {isLoadingMoreMap[currentFilter]
+                  ? "加载中..."
+                  : hasMoreMap[currentFilter]
+                  ? "下拉加载更多"
+                  : "已加载全部数据"}
               </div>
-            </div>
-          ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -803,7 +545,7 @@ const HistoryAnalysisPage = () => {
         </div>
       </div>
 
-      {/* 删除确认弹窗 */}
+      {/* 删除弹窗 */}
       <div
         className={`modal-overlay ${showDeleteModal ? "show" : ""}`}
         id="deleteModal"
