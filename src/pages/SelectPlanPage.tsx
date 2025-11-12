@@ -105,7 +105,8 @@ const SelectPlanPage: React.FC = () => {
   // Pick preferred table: prefer current selection's table, else first
   const chooseTargetTable = async (
     list: { id: string; name: string }[],
-    sdk: any
+    sdk: any,
+    currentViewId: string | null
   ): Promise<{ id: string; name: string }> => {
     try {
       const selection = await sdk?.base?.getSelection?.();
@@ -115,11 +116,14 @@ const SelectPlanPage: React.FC = () => {
       const table = await sdk.base.getTable(currentId);
       const viewMetaList = await table.getViewMetaList();
       const views = viewMetaList.map((v: any) => ({ id: v.id, name: v.name }));
-      setState((prev) => ({
-        ...prev,
-        selectedView: views?.length > 0 ? views[0].id : null,
-      }));
-      setSelectedViewOption(views?.length > 0 ? views[0].name : "");
+      setSelectedViewOption(
+        views?.length > 0
+          ? views.filter(
+              (item: { id: string; name: string }) => item.id === currentViewId
+            )[0]?.name
+          : ""
+      );
+
       setViews(views);
       return found ?? list[0];
     } catch {
@@ -140,18 +144,6 @@ const SelectPlanPage: React.FC = () => {
   };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const sdk: any = bitable ?? (window as any).bitable;
-        const selection = await sdk?.base?.getSelection?.();
-        fetchUserAnalysisPlan(selection?.tableId, selection?.viewId);
-        const currentTableId = selection?.tableId ?? null;
-        if (currentTableId) {
-          setState((prev) => ({ ...prev, selectedTable: currentTableId }));
-        }
-      } catch {}
-    })();
-
     const applyMax = () => {
       const leftSidebar = (window as any).__LEFT_SIDEBAR_WIDTH__ || 280;
       const pageWidth =
@@ -170,8 +162,19 @@ const SelectPlanPage: React.FC = () => {
       try {
         setLoadingTables(true);
         setLoadError("");
-        // Prefer SDK import; fall back to window if needed
         const sdk: any = bitable ?? (window as any).bitable;
+        const selection = await sdk?.base?.getSelection?.();
+        fetchUserAnalysisPlan(selection?.tableId, selection?.viewId);
+        const currentTableId = selection?.tableId ?? null;
+        const currentViewId = selection?.viewId ?? null;
+        if (currentTableId) {
+          setState((prev) => ({
+            ...prev,
+            selectedTable: currentTableId,
+            selectedView: currentViewId,
+          }));
+        }
+        // Prefer SDK import; fall back to window if needed
         if (!sdk?.base) {
           throw new Error("未检测到 Lark Base 运行环境");
         }
@@ -189,7 +192,7 @@ const SelectPlanPage: React.FC = () => {
           if (mounted) setTables(mapped);
           // Auto select first
           if (mounted && mapped.length > 0) {
-            const target = await chooseTargetTable(mapped, sdk);
+            const target = await chooseTargetTable(mapped, sdk, currentViewId);
             setSelectedOption(target.name);
             selectTable(target.id, target.name, sdk);
           }
@@ -218,7 +221,7 @@ const SelectPlanPage: React.FC = () => {
         if (!mounted) return;
         setTables(mapped);
         if (mapped.length > 0) {
-          const target = await chooseTargetTable(mapped, sdk);
+          const target = await chooseTargetTable(mapped, sdk, currentViewId);
           setSelectedOption(target.name);
           selectTable(target.id, target.name, sdk);
         }
@@ -462,7 +465,9 @@ const SelectPlanPage: React.FC = () => {
         "selectedRecords",
         JSON.stringify(state.selectedRecords)
       );
-      navigate("/processing");
+      navigate("/processing", {
+        state: { tableId: state.selectedTable, viewId: state.selectedView },
+      });
     } catch (error) {
       console.error("提交失败:", error);
       // 可以在这里添加错误提示
@@ -472,7 +477,7 @@ const SelectPlanPage: React.FC = () => {
   };
 
   const goBack = () => {
-    navigate(-1);
+    navigate("/");
   };
 
   const isSubmitDisabled =

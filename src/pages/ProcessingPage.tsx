@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Toast, Modal } from "@douyinfe/semi-ui";
 import {
   DataDTO,
@@ -156,6 +156,7 @@ const ProcessingPage: React.FC = () => {
   const isTerminatedRef = useRef<boolean>(false);
   const tableRef = useRef<any>(null);
   const requestIdRef = useRef<string | null>(null);
+  const { state } = useLocation();
 
   // 记录总数
   const recordAllCount = useRef<number>(0);
@@ -225,15 +226,14 @@ const ProcessingPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       const sdk: any = bitable ?? (window as any).bitable;
-      const selection = await sdk?.base?.getSelection?.();
-
+      console.log(state?.tableId, state?.viewId);
       const recordList = JSON.parse(
         localStorage.getItem("selectedRecords") || "[]"
       );
 
       const res = (await getUserAnalysisPlan({
-        table_id: selection?.tableId,
-        view_id: selection?.viewId,
+        table_id: state?.tableId,
+        view_id: state?.viewId,
       })) as UserAnalysisPlanVO;
 
       const table = await sdk.base.getTable(res.tableId);
@@ -717,9 +717,10 @@ const ProcessingPage: React.FC = () => {
     }
 
     // 生成标签
-    // 只展示两个 tag：融资热度 和 增长热度，格式为 "字段名称：字段的值"
+    // 只展示两个 tag：融资热度 、客户优先级 和 增长热度，格式为 "字段名称：字段的值"
     const financingHeat = getField("融资热度", "");
     const growthHeat = getField("增长热度", "");
+    const customerPriority = getField("客户优先级", "");
 
     const tags: Tag[] = [];
 
@@ -737,6 +738,10 @@ const ProcessingPage: React.FC = () => {
     tags.push({
       text: `增长热度：${growthHeat || "未知"}`,
       type: makeType(growthHeat),
+    });
+    tags.push({
+      text: `客户优先级：${customerPriority || "未知"}`,
+      type: makeType(customerPriority),
     });
 
     return {
@@ -1091,7 +1096,6 @@ const ProcessingPage: React.FC = () => {
       (error: unknown) => {
         // 处理错误
         console.error("SSE 错误:", error);
-        Toast.error("数据处理出错");
       }
     );
   };
@@ -1323,7 +1327,6 @@ const ProcessingPage: React.FC = () => {
       (error: unknown) => {
         // 处理错误
         console.error("SSE 错误:", error);
-        Toast.error("数据处理出错");
       }
     );
   };
@@ -1665,11 +1668,11 @@ const ProcessingPage: React.FC = () => {
               >
                 <span className="stage-status">
                   {progressPercents.p4 >= 100 ? (
-                    "📊"
+                    <span className={`stage-status done`}>✓</span>
                   ) : (
                     <span className="stage-status loading">⟳</span>
                   )}
-                </span>{" "}
+                </span>
                 AI找客实时分析中 ...
               </span>
               <span
