@@ -14,13 +14,22 @@
 }
 
 .processing-page-title {
-  font-size: 14px;
+  font-size: 16px;
   color: #333;
   margin-bottom: 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-weight: 500;
+}
+
+.processing-page-back-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #333;
+  cursor: pointer;
+  transition: color 0.2s ease;
 }
 
 .processing-page-title-stats {

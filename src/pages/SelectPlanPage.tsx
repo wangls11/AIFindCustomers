@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import "./SelectPlanPage.css";
+import "./SelectPlanPage.scss";
 import { bitable } from "@lark-base-open/js-sdk";
-import {
-  getUserAnalysisPlan,
-  saveUserAnalysisPlan,
-  UserAnalysisPlanVO,
-} from "@/api";
+import { getUserAnalysisPlan, saveUserAnalysisPlan, UserAnalysisPlanVO } from "@/api";
 import MenuButtonWithDropdown from "@/components/MenuButtonWithDropdown";
 
 type AppState = {
@@ -107,7 +103,7 @@ const SelectPlanPage: React.FC = () => {
   const chooseTargetTable = async (
     list: { id: string; name: string }[],
     sdk: any,
-    currentViewId: string | null
+    currentViewId: string | null,
   ): Promise<{ id: string; name: string }> => {
     try {
       const selection = await sdk?.base?.getSelection?.();
@@ -119,10 +115,8 @@ const SelectPlanPage: React.FC = () => {
       const views = viewMetaList.map((v: any) => ({ id: v.id, name: v.name }));
       setSelectedViewOption(
         views?.length > 0
-          ? views.filter(
-              (item: { id: string; name: string }) => item.id === currentViewId
-            )[0]?.name
-          : ""
+          ? views.filter((item: { id: string; name: string }) => item.id === currentViewId)[0]?.name
+          : "",
       );
 
       setViews(views);
@@ -147,8 +141,7 @@ const SelectPlanPage: React.FC = () => {
   useEffect(() => {
     const applyMax = () => {
       const leftSidebar = (window as any).__LEFT_SIDEBAR_WIDTH__ || 280;
-      const pageWidth =
-        window.innerWidth || document.documentElement.clientWidth;
+      const pageWidth = window.innerWidth || document.documentElement.clientWidth;
       const maxW = Math.max(410, pageWidth - leftSidebar - 80);
     };
     applyMax();
@@ -213,11 +206,10 @@ const SelectPlanPage: React.FC = () => {
             } catch {
               return {
                 id: t.id,
-                name:
-                  typeof t.getName === "function" ? await t.getName() : t.name,
+                name: typeof t.getName === "function" ? await t.getName() : t.name,
               };
             }
-          })
+          }),
         );
         if (!mounted) return;
         setTables(mapped);
@@ -261,11 +253,7 @@ const SelectPlanPage: React.FC = () => {
     selectView(viewId, label);
   };
 
-  const selectTable = async (
-    tableId: string,
-    label?: string,
-    existingSdk?: any
-  ) => {
+  const selectTable = async (tableId: string, label?: string, existingSdk?: any) => {
     if (!tableId) return;
     setState((prev) => ({
       ...prev,
@@ -311,13 +299,10 @@ const SelectPlanPage: React.FC = () => {
               } catch {
                 return {
                   id: f.id,
-                  name:
-                    typeof f.getName === "function"
-                      ? await f.getName()
-                      : f.name,
+                  name: typeof f.getName === "function" ? await f.getName() : f.name,
                 };
               }
-            })
+            }),
           );
         }
         const mappedFields = fieldMetas
@@ -356,10 +341,7 @@ const SelectPlanPage: React.FC = () => {
       const tableId = state.selectedTable;
       const viewId = selection?.viewId;
       if (!tableId || !viewId) return;
-      const recordIds: string[] = await sdk.ui.selectRecordIdList(
-        tableId,
-        viewId
-      );
+      const recordIds: string[] = await sdk.ui.selectRecordIdList(tableId, viewId);
       setState((prev) => ({ ...prev, selectedRecords: recordIds }));
       setRecordCount(recordIds.length);
     } catch {}
@@ -369,11 +351,7 @@ const SelectPlanPage: React.FC = () => {
     setState((prev) => ({ ...prev, currentPlan: plan }));
   };
 
-  const toggleTag = (
-    tag: string,
-    groupName: "valueProp" | "industry",
-    isOther = false
-  ) => {
+  const toggleTag = (tag: string, groupName: "valueProp" | "industry", isOther = false) => {
     if (groupName === "valueProp") {
       if (isOther) {
         setShowOtherInputs((prev) => ({ ...prev, valueProp: !prev.valueProp }));
@@ -462,10 +440,7 @@ const SelectPlanPage: React.FC = () => {
       });
 
       // 跳转页面的时候使用缓存存储选这的客户recordIds
-      localStorage.setItem(
-        "selectedRecords",
-        JSON.stringify(state.selectedRecords)
-      );
+      localStorage.setItem("selectedRecords", JSON.stringify(state.selectedRecords));
       navigate("/processing", {
         state: { tableId: state.selectedTable, viewId: state.selectedView },
       });
@@ -488,7 +463,7 @@ const SelectPlanPage: React.FC = () => {
     isSubmitting;
 
   return (
-    <div className="panel">
+    <div className="select-plan">
       <header className="top">
         <button
           className="back-btn"
@@ -527,9 +502,7 @@ const SelectPlanPage: React.FC = () => {
               {tables.map((table) => (
                 <div
                   key={table.id}
-                  className={`dropdown-item ${
-                    state.selectedTable === table.id ? "selected" : ""
-                  }`}
+                  className={`dropdown-item ${state.selectedTable === table.id ? "selected" : ""}`}
                   onClick={() => selectOption(table.id, table.name)}
                 >
                   {table.name}
@@ -553,9 +526,7 @@ const SelectPlanPage: React.FC = () => {
               {views.map((view) => (
                 <div
                   key={view.id}
-                  className={`dropdown-item ${
-                    state.selectedView === view.id ? "selected" : ""
-                  }`}
+                  className={`dropdown-item ${state.selectedView === view.id ? "selected" : ""}`}
                   onClick={() => selectViewOption(view.id, view.name)}
                 >
                   {view.name}
@@ -563,16 +534,10 @@ const SelectPlanPage: React.FC = () => {
               ))}
             </div>
           </div>
-          {errors.table && (
-            <div className={`error-message show`}>{errors.table}</div>
-          )}
+          {errors.table && <div className={`error-message show`}>{errors.table}</div>}
         </div>
 
-        <div
-          className={`step-section fields-section ${
-            showFieldsSection ? "show" : ""
-          }`}
-        >
+        <div className={`step-section fields-section ${showFieldsSection ? "show" : ""}`}>
           <div className="step-header">
             <div className="step-number">2️⃣</div>
             <div className="step-title">告诉我你关心什么</div>
@@ -582,9 +547,7 @@ const SelectPlanPage: React.FC = () => {
             已勾选：<span>{fieldCount}</span> 个信息
           </div>
           <div className="checkbox-group">
-            {loadingFields && (
-              <div className="checkbox-item">字段加载中...</div>
-            )}
+            {loadingFields && <div className="checkbox-item">字段加载中...</div>}
             {state.selectedTable &&
               !loadingFields &&
               (fieldsByTable[state.selectedTable] || []).map((field) => (
@@ -592,10 +555,7 @@ const SelectPlanPage: React.FC = () => {
                   <input
                     type="checkbox"
                     value={field.id}
-                    checked={
-                      state.selectedFields.includes(field.id) ||
-                      field.name === "企业名称"
-                    }
+                    checked={state.selectedFields.includes(field.id) || field.name === "企业名称"}
                     disabled={field.name === "企业名称"}
                     onChange={() => toggleField(field.id)}
                   />
@@ -603,16 +563,10 @@ const SelectPlanPage: React.FC = () => {
                 </label>
               ))}
           </div>
-          {errors.field && (
-            <div className={`error-message show`}>{errors.field}</div>
-          )}
+          {errors.field && <div className={`error-message show`}>{errors.field}</div>}
         </div>
 
-        <div
-          className={`step-section records-section ${
-            showRecordsSection ? "show" : ""
-          }`}
-        >
+        <div className={`step-section records-section ${showRecordsSection ? "show" : ""}`}>
           <div className="step-header">
             <div className="step-number">3️⃣</div>
             <div className="step-title">选择要分析的客户</div>
@@ -627,25 +581,19 @@ const SelectPlanPage: React.FC = () => {
               <span>{recordCount}</span> 个客户
             </div>
           </div>
-          {errors.record && (
-            <div className={`error-message show`}>{errors.record}</div>
-          )}
+          {errors.record && <div className={`error-message show`}>{errors.record}</div>}
         </div>
 
         <div>
           <div className="plan-tabs">
             <button
-              className={`plan-tab ${
-                state.currentPlan === "quick" ? "active" : ""
-              }`}
+              className={`plan-tab ${state.currentPlan === "quick" ? "active" : ""}`}
               onClick={() => switchPlan("quick")}
             >
               ⚡ 快速方案
             </button>
             <button
-              className={`plan-tab ${
-                state.currentPlan === "custom" ? "active" : ""
-              }`}
+              className={`plan-tab ${state.currentPlan === "custom" ? "active" : ""}`}
               disabled
               // onClick={() => switchPlan("custom")}
             >
@@ -808,10 +756,7 @@ const SelectPlanPage: React.FC = () => {
                           productInfo.valueProps.includes(prop) ? "active" : ""
                         }`}
                         onClick={() => {
-                          if (
-                            productInfo.valueProps.includes(prop) ||
-                            valuePropsCount < 3
-                          ) {
+                          if (productInfo.valueProps.includes(prop) || valuePropsCount < 3) {
                             toggleTag(prop, "valueProp");
                           } else {
                             window.alert("最多只能选择 3 个选项");
@@ -822,9 +767,7 @@ const SelectPlanPage: React.FC = () => {
                       </div>
                     ))}
                     <div
-                      className={`tag-item ${
-                        showOtherInputs.valueProp ? "active" : ""
-                      }`}
+                      className={`tag-item ${showOtherInputs.valueProp ? "active" : ""}`}
                       onClick={() => {
                         if (showOtherInputs.valueProp || valuePropsCount < 3) {
                           toggleTag("其他", "valueProp", true);
@@ -846,13 +789,10 @@ const SelectPlanPage: React.FC = () => {
                         onChange={(e) => {
                           const otherValue = e.target.value;
                           const allValueProps = valuePropOptions.filter((p) =>
-                            productInfo.valueProps.includes(p)
+                            productInfo.valueProps.includes(p),
                           );
                           if (otherValue) {
-                            const updatedValueProps = [
-                              ...allValueProps,
-                              otherValue,
-                            ];
+                            const updatedValueProps = [...allValueProps, otherValue];
                             setProductInfo((prev) => ({
                               ...prev,
                               valueProps: updatedValueProps.slice(0, 3),
@@ -1084,9 +1024,7 @@ const SelectPlanPage: React.FC = () => {
                       <div
                         key={industry}
                         className={`tag-item ${
-                          productInfo.industries.includes(industry)
-                            ? "active"
-                            : ""
+                          productInfo.industries.includes(industry) ? "active" : ""
                         }`}
                         onClick={() => toggleTag(industry, "industry")}
                       >
@@ -1094,9 +1032,7 @@ const SelectPlanPage: React.FC = () => {
                       </div>
                     ))}
                     <div
-                      className={`tag-item ${
-                        showOtherInputs.industry ? "active" : ""
-                      }`}
+                      className={`tag-item ${showOtherInputs.industry ? "active" : ""}`}
                       onClick={() => toggleTag("其他", "industry", true)}
                     >
                       其他
@@ -1116,15 +1052,12 @@ const SelectPlanPage: React.FC = () => {
                               .split(",")
                               .map((i) => i.trim())
                               .filter((i) => i);
-                            const existingIndustries = industryOptions.filter(
-                              (ind) => productInfo.industries.includes(ind)
+                            const existingIndustries = industryOptions.filter((ind) =>
+                              productInfo.industries.includes(ind),
                             );
                             setProductInfo((prev) => ({
                               ...prev,
-                              industries: [
-                                ...existingIndustries,
-                                ...industries,
-                              ],
+                              industries: [...existingIndustries, ...industries],
                             }));
                           }
                         }}
@@ -1156,11 +1089,7 @@ const SelectPlanPage: React.FC = () => {
           <button className="action-btn secondary" onClick={goBack}>
             返回
           </button>
-          <button
-            className="action-btn primary"
-            onClick={submitForm}
-            disabled={isSubmitDisabled}
-          >
+          <button className="action-btn primary" onClick={submitForm} disabled={isSubmitDisabled}>
             {isSubmitting ? "提交中..." : "开始分析 →"}
           </button>
         </div>

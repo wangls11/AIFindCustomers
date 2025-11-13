@@ -1,6 +1,13 @@
 import { useNavigate } from "react-router";
+import { useState, useCallback, useEffect } from "react";
+import { Modal, Button, Toast } from "@douyinfe/semi-ui";
 import "./PurchaseCreditsPage.css";
 import MenuButtonWithDropdown from "@/components/MenuButtonWithDropdown";
+import PaymentMethodCards from "@/components/payment-method-cards";
+import { PaymentQRCode } from "@/components/payment-qrcode";
+import PaymentAgreement from "@/components/payment-agreement";
+import { defaultPaymentMethodList } from "@/components/payment-method-cards";
+import { AppPricePayType, fetchAppPricePay } from "@/api/payment";
 
 // 套餐数据类型定义
 interface Package {
@@ -25,19 +32,7 @@ interface FAQ {
 // 套餐数据
 const packages: Package[] = [
   {
-    id: "basic",
-    title: "基础包",
-    subtitle: "新手首选，立即开始",
-    credits: 1000,
-    companies: 40,
-    price: 99,
-    costPerCompany: 2.48,
-    bonus: null,
-    savings: null,
-    recommended: false,
-  },
-  {
-    id: "standard",
+    id: "STANDARD",
     title: "标准包",
     subtitle: "性价比之选",
     credits: 3300,
@@ -49,7 +44,20 @@ const packages: Package[] = [
     recommended: true,
   },
   {
-    id: "professional",
+    id: "BASIC",
+    title: "基础包",
+    subtitle: "新手首选，立即开始",
+    credits: 1000,
+    companies: 40,
+    price: 99,
+    costPerCompany: 2.48,
+    bonus: null,
+    savings: null,
+    recommended: false,
+  },
+
+  {
+    id: "SPECIALIZED",
     title: "专业包",
     subtitle: "💎 重度用户专享",
     credits: 8000,
@@ -86,11 +94,98 @@ const faqs: FAQ[] = [
 const PurchaseCreditsPage = () => {
   const navigate = useNavigate();
 
+  // 支付相关状态
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("alipay");
+  const [price, setPrice] = useState(0);
+  const [paymentHtml, setPaymentHtml] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [paymentOrderId, setPaymentOrderId] = useState("");
+  const [planId, setPlanId] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
   // 购买套餐
-  const buyPackage = (packageId: string): void => {
-    console.log("购买套餐:", packageId);
-    alert(`即将购买${packageId}套餐`);
+  const buyPackage = (plan: Package) => {
+    setPlanId(plan.id);
+    setPrice(plan.price);
+    setIsPaymentOpen(true);
+
+    // 移动端不自动创建订单，等用户选择支付方式后再创建
+    if (!isMobile) {
+      createPaymentOrder(plan.id, paymentMethod);
+    }
   };
+
+  // 支付方法变更
+  const handlePaymentMethodChange = (value: string) => {
+    if (value === paymentMethod) return;
+
+    setPaymentMethod(value);
+    // 根据支付方式重新获取支付二维码
+    createPaymentOrder(planId, value);
+  };
+
+  // 创建支付订单
+  const createPaymentOrder = async (planId: string, payType = paymentMethod) => {
+    setLoading(true);
+
+    try {
+      const resp = await fetchAppPricePay({
+        payType: planId,
+        orderType: payType.toUpperCase(),
+        tradeType: isMobile ? "MWEB" : "NATIVE",
+      });
+
+      if (!resp) return;
+
+      const { codeUrl, orderNo } = resp;
+
+      if (isMobile) {
+        window.location.href = codeUrl;
+        setTimeout(() => {
+          setIsPaymentOpen(false);
+        }, 5000);
+      } else {
+        // 设置支付表单 HTML 并打开弹窗
+        setPaymentHtml(codeUrl);
+        setPaymentOrderId(orderNo);
+        setIsPaymentOpen(true);
+      }
+    } catch (error: any) {
+      Toast.error({ content: error.message || "支付请求失败，请稍后重试！" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 支付成功处理
+  const handlePaymentSuccess = () => {
+    setTimeout(() => {
+      setIsSuccessOpen(true);
+      setIsPaymentOpen(false);
+      setPaymentMethod("alipay");
+    }, 0);
+  };
+
+  // 关闭支付对话框
+  const handlePaymentClose = useCallback(() => {
+    setIsPaymentOpen(false);
+    setPaymentHtml("");
+    setPaymentOrderId("");
+    setLoading(false);
+    setPaymentMethod("alipay");
+  }, []);
+
+  // 检测移动端
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, []);
 
   // 返回上一页
   const goBack = () => {
@@ -175,7 +270,7 @@ const PurchaseCreditsPage = () => {
                   {pkg.savings && <span className="pcp-savings-tag">{pkg.savings}</span>}
                 </div>
 
-                <button className="pcp-buy-button" onClick={() => buyPackage(pkg.id)}>
+                <button className="pcp-buy-button" onClick={() => buyPackage(pkg)}>
                   立即购买{pkg.title}
                 </button>
 
@@ -201,6 +296,85 @@ const PurchaseCreditsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* 支付组件 */}
+      <Modal
+        title="支付订单"
+        visible={isPaymentOpen}
+        onCancel={handlePaymentClose}
+        footer={null}
+        width={isMobile ? "90%" : 544}
+        centered
+        bodyStyle={{ paddingBottom: "28px" }}
+      >
+        {!isMobile && (
+          <PaymentMethodCards
+            paymentMethod={paymentMethod}
+            paymentMethodList={defaultPaymentMethodList}
+            onClick={handlePaymentMethodChange}
+          />
+        )}
+
+        <div className="mt-2 flex h-full w-full flex-col items-center">
+          <div className="h-10 text-2xl font-semibold">支付金额：{price}元</div>
+          {!isMobile && (
+            <PaymentQRCode
+              codeUrl={paymentHtml}
+              paymentMethod={paymentMethod}
+              loading={loading}
+              orderId={paymentOrderId}
+              isMobile={isMobile}
+              countdown={false}
+              continueQuery={isPaymentOpen} // 当对话框关闭时，停止查询订单状态
+              onSuccess={handlePaymentSuccess}
+              onClose={handlePaymentClose}
+            />
+          )}
+        </div>
+
+        {isMobile ? (
+          <>
+            <PaymentAgreement />
+            <PaymentMethodCards
+              paymentMethod={paymentMethod}
+              paymentMethodList={defaultPaymentMethodList.filter(
+                (item: any) => (isMobile && item.value === "alipay") || !isMobile,
+              )}
+              onClick={(method: string) => createPaymentOrder(planId, method)}
+            />
+          </>
+        ) : (
+          <PaymentAgreement />
+        )}
+      </Modal>
+
+      <Modal
+        visible={isSuccessOpen}
+        onOk={() => setIsSuccessOpen(false)}
+        onCancel={() => setIsSuccessOpen(false)}
+        footer={
+          <Button
+            theme="solid"
+            type="primary"
+            style={{ marginLeft: "0" }}
+            block
+            onClick={() => setIsSuccessOpen(false)}
+          >
+            我知道了
+          </Button>
+        }
+        closable={false}
+        centered
+      >
+        <div className="flex flex-col items-center justify-center">
+          <img src="/clap_hands.svg" alt="" width={230} height={64} />
+          <div className="w-full text-center text-sm">
+            恭喜您
+            <br />
+            本次交易支付成功！
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
