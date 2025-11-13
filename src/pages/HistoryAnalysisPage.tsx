@@ -153,6 +153,8 @@ const HistoryAnalysisPage = () => {
       startTime,
       pauseTime,
       completeTime,
+      tableId: r.tableId,
+      viewId: r.viewId,
     };
   };
 
@@ -242,8 +244,21 @@ const HistoryAnalysisPage = () => {
   // ======================== Actions ========================
   const goBack = () => navigate(-1);
   const startNewAnalysis = () => navigate("/select-plan");
-  const openSession = (id: number | string, status: string) => {
-    console.log("打开会话:", id, "状态:", status);
+  const openSession = (data: any) => {
+    if (data.status === "0") {
+      Toast.info("会话正在进行中");
+      return;
+    }
+    console.log("打开会话:", data);
+    navigate("/processing", {
+      state: {
+        tableId: data.tableId,
+        viewId: data.viewId,
+        requestId: data.id,
+        status: data.status,
+        total: data.total,
+      },
+    });
   };
 
   const filterSessions = (type: string) => {
@@ -530,9 +545,9 @@ const HistoryAnalysisPage = () => {
                 <div
                   key={session.id}
                   className={`session-card ${
-                    session.status === "0" ? "processing" : ""
+                    session.status === "0" ? "processing " : ""
                   }`}
-                  onClick={() => openSession(session.id, session.status)}
+                  onClick={() => openSession(session)}
                 >
                   <div className="card-header">
                     <div className="session-name">{session.name}</div>

@@ -14,6 +14,7 @@ import {
 import "./ProcessingPage.css";
 import { bitable, FieldType } from "@lark-base-open/js-sdk";
 import AnalysisCompleteModal from "../components/AnalysisCompleteModal";
+import { getRecord, UserRequestRecord } from "@/api/history";
 
 // ==================== 数据 ====================
 type Tag = { text: string; type: "positive" | "warning" | "danger" };
@@ -139,7 +140,9 @@ const ProcessingPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [currentSort, setCurrentSort] = useState("score");
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [archiveLoadingStates, setArchiveLoadingStates] = useState<Record<string, boolean>>({});
+  const [archiveLoadingStates, setArchiveLoadingStates] = useState<
+    Record<string, boolean>
+  >({});
   const [archiveShown, setArchiveShown] = useState(false);
   const [selectedArchive, setSelectedArchive] = useState<{
     name: string;
@@ -157,6 +160,8 @@ const ProcessingPage: React.FC = () => {
   const tableRef = useRef<any>(null);
   const requestIdRef = useRef<string | null>(null);
   const { state } = useLocation();
+  // 存放从后端一次性拉取的所有记录（分页合并）
+  const fetchedRecordsRef = useRef<UserRequestRecord[]>([]);
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
 
   // 记录总数
@@ -172,7 +177,8 @@ const ProcessingPage: React.FC = () => {
     if (isLoading && !isTerminated) {
       Modal.confirm({
         title: "确认终止当前的分析任务吗？",
-        content: "现在返回上一页，已处理的数据将全部保留，未处理的数据将不再继续分析。",
+        content:
+          "现在返回上一页，已处理的数据将全部保留，未处理的数据将不再继续分析。",
         okText: "返回并终止分析",
         cancelText: "继续分析",
         okButtonProps: { theme: "solid", type: "danger" as any },
@@ -226,8 +232,222 @@ const ProcessingPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       const sdk: any = bitable ?? (window as any).bitable;
-      console.log(state?.tableId, state?.viewId);
-      const recordList = JSON.parse(localStorage.getItem("selectedRecords") || "[]");
+
+      // 如果来自历史记录页面，state 会包含 requestId（以及 status）
+      if (state?.status === "1") {
+        setTotalRecords(state?.total);
+        setIsPaused(true);
+        setRequestId(state?.requestId);
+
+        // 通过 state 提供的 requestId 调用后端分页接口，将所有页合并成一个数组
+        async function fetchAllRecords(requestId?: string) {
+          if (!requestId) return [] as UserRequestRecord[];
+          const pageSize = 10; // 每页拉取数量（可根据后端限制调整）
+          let pageNO = 1;
+          let all: UserRequestRecord[] = [];
+
+          while (true) {
+            try {
+              const payload = {
+                requestId: requestId,
+                pageNO,
+                pageSize,
+              } as any;
+              const res: any = await getRecord(payload);
+              // 注意：request.post 的响应拦截器已返回接口的 data 部分（即 { total, dataList })
+              const pageData: UserRequestRecord[] =
+                (res?.dataList as UserRequestRecord[]) || [];
+              const total: number = res?.total ?? (pageData.length || 0);
+
+              all = all.concat(pageData);
+
+              // 计算是否读取完成
+              const totalPages =
+                total && pageSize > 0
+                  ? Math.ceil(total / pageSize)
+                  : pageData.length === 0
+                  ? pageNO
+                  : pageNO + 1;
+              if (pageNO >= totalPages || pageData.length === 0) break;
+              pageNO++;
+            } catch (e) {
+              console.error("fetchAllRecords error:", e);
+              break;
+            }
+          }
+
+          return all;
+        }
+
+        const allRecords = await fetchAllRecords(
+          state?.requestId || state?.requestID || state?.id
+        );
+        setLoadedCount(allRecords.length);
+        fetchedRecordsRef.current = allRecords;
+        // 更新总数展示用变量
+        recordAllCount.current = allRecords.length;
+        console.log("fetched all records:", allRecords);
+        let currentRank = 1;
+        allRecords.forEach((record) => {
+          // 生成档案内容：优先使用 SSE 返回的 customerDoc（markdown），否则使用默认的 generateArchive
+          // 转换为 Company 对象
+          const company = convertFieldsToCompany(
+            JSON.parse(record?.pushData || "{}"),
+            currentRank,
+            state.recordId,
+            state.tableId
+          );
+          try {
+            const customerDoc =
+              typeof record?.customerDoc === "string"
+                ? JSON.parse(record.customerDoc)
+                : record?.customerDoc ?? {};
+            if (
+              customerDoc &&
+              (customerDoc.title ||
+                customerDoc.header ||
+                Object.keys(customerDoc).length > 0)
+            ) {
+              company.archive = renderCustomerDocToHtml(
+                customerDoc as Record<string, any>
+              );
+            }
+          } catch (err) {
+            console.warn("渲染 customerDoc 失败，使用默认档案：", err);
+          }
+
+          // 更新状态
+          setFilteredData((prev) => {
+            // 检查是否已存在相同的 recordId
+            const existingIndex = prev.findIndex(
+              (item) => item.recordId === state.recordId
+            );
+
+            if (existingIndex !== -1) {
+              // 如果存在，更新原有的 item 内容
+              const newData = [...prev];
+              newData[existingIndex] = company;
+              return newData;
+            } else {
+              // 如果不存在，添加新的 item
+              const newData = [...prev, company];
+
+              return newData;
+            }
+          });
+        });
+
+        return;
+      } else if (state?.status === "2") {
+        setTotalRecords(state?.total);
+        setIsSuccess(true);
+        setIsLoading(false);
+        setRequestId(state?.requestId);
+
+        // 通过 state 提供的 requestId 调用后端分页接口，将所有页合并成一个数组
+        async function fetchAllRecords(requestId?: string) {
+          if (!requestId) return [] as UserRequestRecord[];
+          const pageSize = 10; // 每页拉取数量（可根据后端限制调整）
+          let pageNO = 1;
+          let all: UserRequestRecord[] = [];
+
+          while (true) {
+            try {
+              const payload = {
+                requestId: requestId,
+                pageNO,
+                pageSize,
+              } as any;
+              const res: any = await getRecord(payload);
+              // 注意：request.post 的响应拦截器已返回接口的 data 部分（即 { total, dataList })
+              const pageData: UserRequestRecord[] =
+                (res?.dataList as UserRequestRecord[]) || [];
+              const total: number = res?.total ?? (pageData.length || 0);
+
+              all = all.concat(pageData);
+
+              // 计算是否读取完成
+              const totalPages =
+                total && pageSize > 0
+                  ? Math.ceil(total / pageSize)
+                  : pageData.length === 0
+                  ? pageNO
+                  : pageNO + 1;
+              if (pageNO >= totalPages || pageData.length === 0) break;
+              pageNO++;
+            } catch (e) {
+              console.error("fetchAllRecords error:", e);
+              break;
+            }
+          }
+
+          return all;
+        }
+
+        const allRecords = await fetchAllRecords(
+          state?.requestId || state?.requestID || state?.id
+        );
+        setLoadedCount(allRecords.length);
+        fetchedRecordsRef.current = allRecords;
+        // 更新总数展示用变量
+        recordAllCount.current = allRecords.length;
+        console.log("fetched all records:", allRecords);
+        let currentRank = 1;
+        allRecords.forEach((record) => {
+          // 生成档案内容：优先使用 SSE 返回的 customerDoc（markdown），否则使用默认的 generateArchive
+          // 转换为 Company 对象
+          const company = convertFieldsToCompany(
+            JSON.parse(record?.pushData || "{}"),
+            currentRank,
+            state.recordId,
+            state.tableId
+          );
+          try {
+            const customerDoc =
+              typeof record?.customerDoc === "string"
+                ? JSON.parse(record.customerDoc)
+                : record?.customerDoc ?? {};
+            if (
+              customerDoc &&
+              (customerDoc.title ||
+                customerDoc.header ||
+                Object.keys(customerDoc).length > 0)
+            ) {
+              company.archive = renderCustomerDocToHtml(
+                customerDoc as Record<string, any>
+              );
+            }
+          } catch (err) {
+            console.warn("渲染 customerDoc 失败，使用默认档案：", err);
+          }
+
+          // 更新状态
+          setFilteredData((prev) => {
+            // 检查是否已存在相同的 recordId
+            const existingIndex = prev.findIndex(
+              (item) => item.recordId === state.recordId
+            );
+
+            if (existingIndex !== -1) {
+              // 如果存在，更新原有的 item 内容
+              const newData = [...prev];
+              newData[existingIndex] = company;
+              return newData;
+            } else {
+              // 如果不存在，添加新的 item
+              const newData = [...prev, company];
+
+              return newData;
+            }
+          });
+        });
+
+        return;
+      }
+
+      const recordList = JSON.parse(
+        localStorage.getItem("selectedRecords") || "[]"
+      );
 
       const res = (await getUserAnalysisPlan({
         table_id: state?.tableId,
@@ -246,23 +466,29 @@ const ProcessingPage: React.FC = () => {
 
       // 获取表的所有字段信息
       const allFieldMetaList = await table.getFieldMetaList();
-      const existingFieldNames = new Set(allFieldMetaList.map((f: any) => f.name));
+      const existingFieldNames = new Set(
+        allFieldMetaList.map((f: any) => f.name)
+      );
       await Promise.all(
         fieldsToAdd
           .filter((field) => !existingFieldNames.has(field.name))
           .map((field) =>
             table
               .addField({ type: field.type, name: field.name })
-              .catch((e: unknown) => console.warn("addField 失败，已跳过：", field.name, e)),
-          ),
+              .catch((e: unknown) =>
+                console.warn("addField 失败，已跳过：", field.name, e)
+              )
+          )
       );
 
       // 解析 res.fieldList，获取需要处理的字段ID列表
-      const selectedFieldIds: string[] = res.fieldList ? JSON.parse(res.fieldList) : [];
+      const selectedFieldIds: string[] = res.fieldList
+        ? JSON.parse(String(res.fieldList))
+        : [];
 
       // 过滤出只在 fieldList 中的字段
       const fieldMetaList = allFieldMetaList.filter((fieldMeta: any) =>
-        selectedFieldIds.includes(fieldMeta.id),
+        selectedFieldIds.includes(fieldMeta.id)
       );
 
       // 根据 recordList 获取记录的详细信息
@@ -270,7 +496,7 @@ const ProcessingPage: React.FC = () => {
         // 批量获取所有记录，然后过滤出选中的记录
         const allRecords = await table.getRecords({});
         const selectedRecordsData = allRecords.records.filter((record: any) =>
-          recordList.includes(record.recordId),
+          recordList.includes(record.recordId)
         );
 
         // 处理每条记录的字段信息，格式化为目标数据结构
@@ -301,7 +527,10 @@ const ProcessingPage: React.FC = () => {
               if (Array.isArray(fieldValue)) {
                 // 如果是数组（bitable常见格式），将数组内容转换为对象
                 // 如果数组只有一个元素且是对象，直接使用该对象
-                if (fieldValue.length === 1 && typeof fieldValue[0] === "object") {
+                if (
+                  fieldValue.length === 1 &&
+                  typeof fieldValue[0] === "object"
+                ) {
                   if (fieldValue[0] && fieldValue[0].type === "text") {
                     fieldValueObj = fieldValue[0].text;
                   }
@@ -330,7 +559,8 @@ const ProcessingPage: React.FC = () => {
             const isValid =
               fieldValueObj !== null &&
               fieldValueObj !== undefined &&
-              (typeof fieldValueObj !== "object" || Object.keys(fieldValueObj).length > 0);
+              (typeof fieldValueObj !== "object" ||
+                Object.keys(fieldValueObj).length > 0);
             if (isValid) {
               recordData.fields.push({
                 fieldId: fieldMeta.id,
@@ -346,7 +576,10 @@ const ProcessingPage: React.FC = () => {
         console.log("记录及其字段信息:", recordsWithFields);
         // 获取 bitable URL（需要 recordId, fieldId, tableId 和 viewId）
 
-        if (recordsWithFields.length > 0 && recordsWithFields[0].fields.length > 0) {
+        if (
+          recordsWithFields.length > 0 &&
+          recordsWithFields[0].fields.length > 0
+        ) {
           const firstRecord = recordsWithFields[0];
           const firstField = firstRecord.fields[0];
           const bitableUrl = await bitable.bridge.getBitableUrl({
@@ -431,7 +664,7 @@ const ProcessingPage: React.FC = () => {
       // 继续
       try {
         const canResume = await checkResume(currentRequestId);
-        if (!canResume?.data) {
+        if (canResume) {
           setIsPaused(false);
           continueProcessing(currentRequestId || "");
           Toast.success({ content: "分析已继续", duration: 3 });
@@ -451,7 +684,10 @@ const ProcessingPage: React.FC = () => {
   // 点击外部关闭排序下拉
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !(dropdownRef.current as any).contains(e.target)) {
+      if (
+        dropdownRef.current &&
+        !(dropdownRef.current as any).contains(e.target)
+      ) {
         setSortDropdownShow(false);
       }
     };
@@ -479,7 +715,7 @@ const ProcessingPage: React.FC = () => {
       type: string | null;
       fieldName: string;
       fieldValue: string | null;
-    }>,
+    }>
   ) => {
     try {
       // 获取记录 - 使用 getRecords 方法，传入 recordIds 参数
@@ -491,7 +727,9 @@ const ProcessingPage: React.FC = () => {
         // 如果 recordIds 参数不支持，则获取所有记录后过滤
         const allRecords = await table.getRecords({});
         recordsResult = {
-          records: allRecords.records.filter((r: any) => r.recordId === recordId),
+          records: allRecords.records.filter(
+            (r: any) => r.recordId === recordId
+          ),
         };
       }
 
@@ -541,7 +779,9 @@ const ProcessingPage: React.FC = () => {
             if (!isNaN(numValue)) {
               valueToSet = numValue;
             } else {
-              console.warn(`无法将值转换为数字: ${fieldValue} (字段: ${field.fieldName})`);
+              console.warn(
+                `无法将值转换为数字: ${fieldValue} (字段: ${field.fieldName})`
+              );
               continue;
             }
           } else if (fieldType === FieldType.DateTime || fieldType === 5) {
@@ -550,7 +790,9 @@ const ProcessingPage: React.FC = () => {
             if (!isNaN(dateValue.getTime())) {
               valueToSet = dateValue.getTime();
             } else {
-              console.warn(`无法将值转换为日期: ${fieldValue} (字段: ${field.fieldName})`);
+              console.warn(
+                `无法将值转换为日期: ${fieldValue} (字段: ${field.fieldName})`
+              );
               continue;
             }
           } else if (fieldType === FieldType.Text || fieldType === 1) {
@@ -619,7 +861,7 @@ const ProcessingPage: React.FC = () => {
     }>,
     rank: number,
     recordId?: string,
-    tableId?: string,
+    tableId?: string
   ): Company => {
     // 创建一个字段映射对象，方便查找
     const fieldMap = new Map<string, string>();
@@ -824,14 +1066,16 @@ const ProcessingPage: React.FC = () => {
     const parts: string[] = [];
     if (doc.title) {
       parts.push(
-        `<div class=\"processing-page-doc-title\"><h2>${escapeHtml(doc.title)}</h2></div>`,
+        `<div class=\"processing-page-doc-title\"><h2>${escapeHtml(
+          doc.title
+        )}</h2></div>`
       );
     }
     if (doc.header) {
       parts.push(
         `<div class=\"processing-page-doc-header\"><strong>${escapeHtml(
-          doc.header,
-        )}</strong></div>`,
+          doc.header
+        )}</strong></div>`
       );
     }
 
@@ -843,11 +1087,15 @@ const ProcessingPage: React.FC = () => {
     sectionKeys.forEach((key) => {
       const content = String(doc[key] ?? "");
       // 如果内容本身包含 markdown 标题或表格，走 mdToHtml
-      parts.push(`<div class=\"processing-page-doc-section\">${mdToHtml(content)}</div>`);
+      parts.push(
+        `<div class=\"processing-page-doc-section\">${mdToHtml(content)}</div>`
+      );
     });
 
     // 组合并返回
-    return `<div class=\"processing-page-customer-doc\">${parts.join("\n")}</div>`;
+    return `<div class=\"processing-page-customer-doc\">${parts.join(
+      "\n"
+    )}</div>`;
   };
 
   const startProcessing = (data: DataDTO) => {
@@ -866,7 +1114,8 @@ const ProcessingPage: React.FC = () => {
           // 处理 REQUEST_ID 事件，获取任务 ID
           if (
             parsedData &&
-            (parsedData.event === "REQUEST_ID" || parsedData.event === "request_id")
+            (parsedData.event === "REQUEST_ID" ||
+              parsedData.event === "request_id")
           ) {
             const taskId = parsedData.data;
             if (taskId) {
@@ -887,13 +1136,17 @@ const ProcessingPage: React.FC = () => {
               parsedData.event === "item_failure")
           ) {
             // 检查是否有 field 数组
-            if (parsedData && parsedData.data && Array.isArray(parsedData.data.fields)) {
+            if (
+              parsedData &&
+              parsedData.data &&
+              Array.isArray(parsedData.data.fields)
+            ) {
               // 更新多维表格记录字段
               if (parsedData.data.recordId && tableRef.current) {
                 updateRecordFields(
                   tableRef.current,
                   parsedData.data.recordId,
-                  parsedData.data.fields,
+                  parsedData.data.fields
                 ).catch((error) => {
                   console.error("更新记录字段失败:", error);
                 });
@@ -904,7 +1157,7 @@ const ProcessingPage: React.FC = () => {
                 parsedData.data.fields,
                 currentRank,
                 parsedData.data.recordId,
-                data.tableId,
+                data.tableId
               );
 
               // 生成档案内容：优先使用 SSE 返回的 customerDoc（markdown），否则使用默认的 generateArchive
@@ -912,9 +1165,13 @@ const ProcessingPage: React.FC = () => {
                 const customerDoc = parsedData?.data?.customerDoc;
                 if (
                   customerDoc &&
-                  (customerDoc.title || customerDoc.header || Object.keys(customerDoc).length > 0)
+                  (customerDoc.title ||
+                    customerDoc.header ||
+                    Object.keys(customerDoc).length > 0)
                 ) {
-                  company.archive = renderCustomerDocToHtml(customerDoc as Record<string, any>);
+                  company.archive = renderCustomerDocToHtml(
+                    customerDoc as Record<string, any>
+                  );
                 }
               } catch (err) {
                 console.warn("渲染 customerDoc 失败，使用默认档案：", err);
@@ -923,7 +1180,9 @@ const ProcessingPage: React.FC = () => {
               // 更新状态
               setFilteredData((prev) => {
                 // 检查是否已存在相同的 recordId
-                const existingIndex = prev.findIndex((item) => item.recordId === company.recordId);
+                const existingIndex = prev.findIndex(
+                  (item) => item.recordId === company.recordId
+                );
 
                 if (existingIndex !== -1) {
                   // 如果存在，更新原有的 item 内容
@@ -946,28 +1205,44 @@ const ProcessingPage: React.FC = () => {
               let percent3 = 0;
               let percent4 = 0;
 
-              if (parsedData.event === "TIANYANCHA" || parsedData.event === "tianyancha") {
+              if (
+                parsedData.event === "TIANYANCHA" ||
+                parsedData.event === "tianyancha"
+              ) {
                 tianYanChaProcessedCount.current++;
                 percent1 = Math.min(
-                  Math.round((tianYanChaProcessedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (tianYanChaProcessedCount.current /
+                      recordAllCount.current) *
+                      100
+                  ),
+                  100
                 );
               }
 
-              if (parsedData.event === "ITEM_SUCCESS" || parsedData.event === "item_success") {
+              if (
+                parsedData.event === "ITEM_SUCCESS" ||
+                parsedData.event === "item_success"
+              ) {
                 processedCount.current++;
                 percent1 = 100;
                 percent2 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent3 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent4 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 setLoadedCount(processedCount.current);
                 setArchiveLoadingStates((prev) => ({
@@ -976,20 +1251,29 @@ const ProcessingPage: React.FC = () => {
                 }));
               }
 
-              if (parsedData.event === "ITEM_FAILURE" || parsedData.event === "item_failure") {
+              if (
+                parsedData.event === "ITEM_FAILURE" ||
+                parsedData.event === "item_failure"
+              ) {
                 processedCount.current++;
                 percent1 = 100;
                 percent2 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent3 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent4 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 setLoadedCount(processedCount.current);
                 setArchiveLoadingStates((prev) => ({
@@ -999,10 +1283,11 @@ const ProcessingPage: React.FC = () => {
               }
 
               const progress = Math.min(
-                ((tianYanChaProcessedCount.current / recordAllCount.current) * 0.5 +
+                ((tianYanChaProcessedCount.current / recordAllCount.current) *
+                  0.5 +
                   (processedCount.current / recordAllCount.current) * 0.5) *
                   100,
-                100,
+                100
               );
 
               setProgressPercents({
@@ -1031,7 +1316,10 @@ const ProcessingPage: React.FC = () => {
             }
           }
 
-          if (parsedData && (parsedData.event === "COMPLETE" || parsedData.event === "complete")) {
+          if (
+            parsedData &&
+            (parsedData.event === "COMPLETE" || parsedData.event === "complete")
+          ) {
             // 检查是否全部完成
             if (processedCount.current >= recordAllCount.current) {
               finishLoading();
@@ -1044,7 +1332,7 @@ const ProcessingPage: React.FC = () => {
       (error: unknown) => {
         // 处理错误
         console.error("SSE 错误:", error);
-      },
+      }
     );
   };
 
@@ -1069,13 +1357,17 @@ const ProcessingPage: React.FC = () => {
               parsedData.event === "item_failure")
           ) {
             // 检查是否有 field 数组
-            if (parsedData && parsedData.data && Array.isArray(parsedData.data.fields)) {
+            if (
+              parsedData &&
+              parsedData.data &&
+              Array.isArray(parsedData.data.fields)
+            ) {
               // 更新多维表格记录字段
               if (parsedData.data.recordId && tableRef.current) {
                 updateRecordFields(
                   tableRef.current,
                   parsedData.data.recordId,
-                  parsedData.data.fields,
+                  parsedData.data.fields
                 ).catch((error) => {
                   console.error("更新记录字段失败:", error);
                 });
@@ -1086,7 +1378,7 @@ const ProcessingPage: React.FC = () => {
                 parsedData.data.fields,
                 currentRank,
                 parsedData.data.recordId,
-                currentTableId,
+                currentTableId
               );
 
               // 生成档案内容：优先使用 SSE 返回的 customerDoc（markdown），否则使用默认的 generateArchive
@@ -1094,9 +1386,13 @@ const ProcessingPage: React.FC = () => {
                 const customerDoc = parsedData?.data?.customerDoc;
                 if (
                   customerDoc &&
-                  (customerDoc.title || customerDoc.header || Object.keys(customerDoc).length > 0)
+                  (customerDoc.title ||
+                    customerDoc.header ||
+                    Object.keys(customerDoc).length > 0)
                 ) {
-                  company.archive = renderCustomerDocToHtml(customerDoc as Record<string, any>);
+                  company.archive = renderCustomerDocToHtml(
+                    customerDoc as Record<string, any>
+                  );
                 }
               } catch (err) {
                 console.warn("渲染 customerDoc 失败，使用默认档案：", err);
@@ -1105,7 +1401,9 @@ const ProcessingPage: React.FC = () => {
               // 更新状态
               setFilteredData((prev) => {
                 // 检查是否已存在相同的 recordId
-                const existingIndex = prev.findIndex((item) => item.recordId === company.recordId);
+                const existingIndex = prev.findIndex(
+                  (item) => item.recordId === company.recordId
+                );
 
                 if (existingIndex !== -1) {
                   // 如果存在，更新原有的 item 内容
@@ -1128,67 +1426,99 @@ const ProcessingPage: React.FC = () => {
               let percent3 = 0;
               let percent4 = 0;
 
-              if (parsedData.event === "TIANYANCHA" || parsedData.event === "tianyancha") {
+              if (
+                parsedData.event === "TIANYANCHA" ||
+                parsedData.event === "tianyancha"
+              ) {
                 tianYanChaProcessedCount.current++;
                 percent1 = Math.min(
-                  Math.round((tianYanChaProcessedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (tianYanChaProcessedCount.current /
+                      recordAllCount.current) *
+                      100
+                  ),
+                  100
                 );
                 percent2 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent3 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent4 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
               }
 
-              if (parsedData.event === "ITEM_SUCCESS" || parsedData.event === "item_success") {
+              if (
+                parsedData.event === "ITEM_SUCCESS" ||
+                parsedData.event === "item_success"
+              ) {
                 processedCount.current++;
                 percent1 = 100;
                 percent2 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent3 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent4 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 setLoadedCount(processedCount.current);
               }
 
-              if (parsedData.event === "ITEM_FAILURE" || parsedData.event === "item_failure") {
+              if (
+                parsedData.event === "ITEM_FAILURE" ||
+                parsedData.event === "item_failure"
+              ) {
                 processedCount.current++;
                 percent1 = 100;
                 percent2 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent3 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 percent4 = Math.min(
-                  Math.round((processedCount.current / recordAllCount.current) * 100),
-                  100,
+                  Math.round(
+                    (processedCount.current / recordAllCount.current) * 100
+                  ),
+                  100
                 );
                 setLoadedCount(processedCount.current);
               }
 
               const progress = Math.min(
-                ((tianYanChaProcessedCount.current / recordAllCount.current) * 0.5 +
+                ((tianYanChaProcessedCount.current / recordAllCount.current) *
+                  0.5 +
                   (processedCount.current / recordAllCount.current) * 0.5) *
                   100,
-                100,
+                100
               );
 
               setProgressPercents({
@@ -1217,7 +1547,10 @@ const ProcessingPage: React.FC = () => {
             }
           }
 
-          if (parsedData && (parsedData.event === "COMPLETE" || parsedData.event === "complete")) {
+          if (
+            parsedData &&
+            (parsedData.event === "COMPLETE" || parsedData.event === "complete")
+          ) {
             // 检查是否全部完成
             if (processedCount.current >= recordAllCount.current) {
               finishLoading();
@@ -1230,7 +1563,7 @@ const ProcessingPage: React.FC = () => {
       (error: unknown) => {
         // 处理错误
         console.error("SSE 错误:", error);
-      },
+      }
     );
   };
 
@@ -1261,7 +1594,8 @@ const ProcessingPage: React.FC = () => {
             缺失: 1,
           } as any;
           return (
-            (completenessOrder[b.completeness] || 0) - (completenessOrder[a.completeness] || 0)
+            (completenessOrder[b.completeness] || 0) -
+            (completenessOrder[a.completeness] || 0)
           );
         case "financing":
           const financingOrder: Record<string, number> = {
@@ -1272,7 +1606,10 @@ const ProcessingPage: React.FC = () => {
             A轮: 1,
             天使: 0,
           } as any;
-          return (financingOrder[b.financing] || 0) - (financingOrder[a.financing] || 0);
+          return (
+            (financingOrder[b.financing] || 0) -
+            (financingOrder[a.financing] || 0)
+          );
         case "employees":
           const employeeOrder: Record<string, number> = {
             "10000+人": 5,
@@ -1281,7 +1618,10 @@ const ProcessingPage: React.FC = () => {
             "500-999人": 2,
             "50-99人": 1,
           } as any;
-          return (employeeOrder[b.employees] || 0) - (employeeOrder[a.employees] || 0);
+          return (
+            (employeeOrder[b.employees] || 0) -
+            (employeeOrder[a.employees] || 0)
+          );
         case "risk":
           const riskOrder: Record<string, number> = {
             低风险: 3,
@@ -1305,7 +1645,9 @@ const ProcessingPage: React.FC = () => {
     // 使用函数式更新，基于当前的 filteredData 进行搜索
     setFilteredData((prev) => {
       if (keyword) {
-        const filtered = prev.filter((c) => c.name.toLowerCase().includes(keyword.toLowerCase()));
+        const filtered = prev.filter((c) =>
+          c.name.toLowerCase().includes(keyword.toLowerCase())
+        );
         return applySort(filtered, currentSort);
       } else {
         return applySort([...prev], currentSort);
@@ -1468,7 +1810,7 @@ const ProcessingPage: React.FC = () => {
    * @returns
    */
   const countByScoreLevel = (
-    companies: Company[],
+    companies: Company[]
   ): {
     excellent: number;
     potential: number;
@@ -1505,10 +1847,16 @@ const ProcessingPage: React.FC = () => {
       <div className="processing-page-header">
         <div className="processing-page-title">
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button className="processing-page-back-btn" onClick={goBack} aria-label="返回">
+            <button
+              className="processing-page-back-btn"
+              onClick={goBack}
+              aria-label="返回"
+            >
               ←
             </button>
-            <div className="processing-page-header-title">{tableName || "AI找客"}</div>
+            <div className="processing-page-header-title">
+              {tableName || "AI找客"}
+            </div>
           </div>
           <span className="processing-page-title-stats">
             <span id="completedCount">{loadedCount}</span>/{totalRecords} 完成
@@ -1529,7 +1877,9 @@ const ProcessingPage: React.FC = () => {
                         gap: "4px",
                       }}
                     >
-                      <span className="processing-page-stage-status loading">⟳</span>{" "}
+                      <span className="processing-page-stage-status loading">
+                        ⟳
+                      </span>{" "}
                       AI找客全力分析中！
                     </div>
                   )
@@ -1540,7 +1890,11 @@ const ProcessingPage: React.FC = () => {
             </div>
             <div className="processing-page-info-right">
               <span id="timeText">
-                {isLoading ? (isPaused ? "暂停中" : "预计 30 秒完成") : "已完成"}
+                {isLoading
+                  ? isPaused
+                    ? "暂停中"
+                    : "预计 30 秒完成"
+                  : "已完成"}
               </span>
             </div>
           </div>
@@ -1561,12 +1915,18 @@ const ProcessingPage: React.FC = () => {
               >
                 {isPaused ? (
                   <>
-                    <span className="processing-page-play-icon" aria-hidden="true"></span>
+                    <span
+                      className="processing-page-play-icon"
+                      aria-hidden="true"
+                    ></span>
                     <span className="processing-page-sr-only">继续</span>
                   </>
                 ) : (
                   <>
-                    <span className="processing-page-pause-icon" aria-hidden="true"></span>
+                    <span
+                      className="processing-page-pause-icon"
+                      aria-hidden="true"
+                    ></span>
                     <span className="processing-page-sr-only">暂停</span>
                   </>
                 )}
@@ -1578,10 +1938,14 @@ const ProcessingPage: React.FC = () => {
                 disabled={terminating || !isLoading}
               >
                 <span
-                  className={`processing-page-stop-icon${terminating ? " spinning" : ""}`}
+                  className={`processing-page-stop-icon${
+                    terminating ? " spinning" : ""
+                  }`}
                   aria-hidden="true"
                 ></span>
-                <span className="processing-page-sr-only">{terminating ? "正在终止" : "终止"}</span>
+                <span className="processing-page-sr-only">
+                  {terminating ? "正在终止" : "终止"}
+                </span>
               </button>
             </div>
           ) : (
@@ -1660,15 +2024,21 @@ const ProcessingPage: React.FC = () => {
               >
                 <span className="processing-page-stage-status">
                   {progressPercents.p4 >= 100 ? (
-                    <span className={`processing-page-stage-status done`}>✓</span>
+                    <span className={`processing-page-stage-status done`}>
+                      ✓
+                    </span>
                   ) : (
-                    <span className="processing-page-stage-status loading">⟳</span>
+                    <span className="processing-page-stage-status loading">
+                      ⟳
+                    </span>
                   )}
                 </span>
                 AI找客实时分析中 ...
               </span>
               <span
-                className={`processing-page-toggle-arrow ${!isProgressCollapsed ? "expanded" : ""}`}
+                className={`processing-page-toggle-arrow ${
+                  !isProgressCollapsed ? "expanded" : ""
+                }`}
               >
                 ▲
               </span>
@@ -1685,9 +2055,13 @@ const ProcessingPage: React.FC = () => {
                   >
                     {progressPercents.p1 >= 100 ? "✓" : "⟳"}
                   </span>
-                  <span className="processing-page-stage-name">企业信息采集</span>
+                  <span className="processing-page-stage-name">
+                    企业信息采集
+                  </span>
                 </div>
-                <span className="processing-page-stage-desc">融资、规模、行业、电话 ...</span>
+                <span className="processing-page-stage-desc">
+                  融资、规模、行业、电话 ...
+                </span>
                 <span className="processing-page-stage-percent" id="percent1">
                   {progressPercents.p1}%
                 </span>
@@ -1701,9 +2075,13 @@ const ProcessingPage: React.FC = () => {
                   >
                     {progressPercents.p2 >= 100 ? "✓" : "⟳"}
                   </span>
-                  <span className="processing-page-stage-name">官网信息分析</span>
+                  <span className="processing-page-stage-name">
+                    官网信息分析
+                  </span>
                 </div>
-                <span className="processing-page-stage-desc">产品、招聘、客户、新闻 ...</span>
+                <span className="processing-page-stage-desc">
+                  产品、招聘、客户、新闻 ...
+                </span>
                 <span className="processing-page-stage-percent" id="percent2">
                   {progressPercents.p2}%
                 </span>
@@ -1717,9 +2095,13 @@ const ProcessingPage: React.FC = () => {
                   >
                     {progressPercents.p3 >= 100 ? "✓" : "⟳"}
                   </span>
-                  <span className="processing-page-stage-name">风险舆情分析</span>
+                  <span className="processing-page-stage-name">
+                    风险舆情分析
+                  </span>
                 </div>
-                <span className="processing-page-stage-desc">风险评级、媒体热度 ...</span>
+                <span className="processing-page-stage-desc">
+                  风险评级、媒体热度 ...
+                </span>
                 <span className="processing-page-stage-percent" id="percent3">
                   {progressPercents.p3}%
                 </span>
@@ -1733,9 +2115,13 @@ const ProcessingPage: React.FC = () => {
                   >
                     {progressPercents.p4 >= 100 ? "✓" : "⟳"}
                   </span>
-                  <span className="processing-page-stage-name">客户档案生成</span>
+                  <span className="processing-page-stage-name">
+                    客户档案生成
+                  </span>
                 </div>
-                <span className="processing-page-stage-desc">评分、建议、评估 ...</span>
+                <span className="processing-page-stage-desc">
+                  评分、建议、评估 ...
+                </span>
                 <span className="processing-page-stage-percent" id="percent4">
                   {progressPercents.p4}%
                 </span>
@@ -1788,9 +2174,12 @@ const ProcessingPage: React.FC = () => {
             const isDisabled = archiveLoadingStates.isDocDisabled;
             // 当分数或标签尚未生成时，显示加载态（与"查看客户档案"按钮一致）
             const isScoreLoading =
-              company.score === -1 || company.score === undefined || !!isArchiveLoading;
+              company.score === -1 ||
+              company.score === undefined ||
+              !!isArchiveLoading;
 
-            const isTagsLoading = !company.tags || company.tags.length === 0 || !!isArchiveLoading;
+            const isTagsLoading =
+              !company.tags || company.tags.length === 0 || !!isArchiveLoading;
             return (
               <div
                 key={company.name}
@@ -1799,15 +2188,23 @@ const ProcessingPage: React.FC = () => {
               >
                 <div style={{ flexGrow: 1 }}>
                   <div className="processing-page-card-top">
-                    <div className="processing-page-company-name">{company.name}</div>
+                    <div className="processing-page-company-name">
+                      {company.name}
+                    </div>
                     <div className="processing-page-score-badge">
                       {isScoreLoading ? (
                         <div style={{ display: "flex" }}>
-                          <span className={`processing-page-stage-status  loading`}>⟳</span>
+                          <span
+                            className={`processing-page-stage-status  loading`}
+                          >
+                            ⟳
+                          </span>
                         </div>
                       ) : (
                         <>
-                          <span className="processing-page-score-value">{company.score}分</span>
+                          <span className="processing-page-score-value">
+                            {company.score}分
+                          </span>
                           {/* <span className="processing-page-score-stars">{stars}</span> */}
                         </>
                       )}
@@ -1816,12 +2213,21 @@ const ProcessingPage: React.FC = () => {
                   <div className="processing-page-card-tags">
                     {isTagsLoading ? (
                       // 与档案加载按钮一致的视觉样式（简洁占位）
-                      <span className={`processing-page-stage-status  loading`}>⟳</span>
+                      <span className={`processing-page-stage-status  loading`}>
+                        ⟳
+                      </span>
                     ) : (
                       company.tags.map((tag, i) => (
                         <React.Fragment key={i}>
-                          {i > 0 && <span className="processing-page-tag-sep" aria-hidden="true" />}
-                          <span className={`processing-page-tag1 ${tag.type}`}>{tag.text}</span>
+                          {i > 0 && (
+                            <span
+                              className="processing-page-tag-sep"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <span className={`processing-page-tag1 ${tag.type}`}>
+                            {tag.text}
+                          </span>
                         </React.Fragment>
                       ))
                     )}
@@ -1832,7 +2238,10 @@ const ProcessingPage: React.FC = () => {
                     <span>{company.founded}成立</span>
                   </div>
                 </div>
-                <div className="processing-page-card-buttons" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="processing-page-card-buttons"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     className="processing-page-btn-feishu"
                     onClick={() => openInFeishu(company.name)}
@@ -1840,14 +2249,22 @@ const ProcessingPage: React.FC = () => {
                     在飞书打开
                   </button>
                   <button
-                    className={`processing-page-btn-archive ${isArchiveLoading ? "loading" : ""}`}
+                    className={`processing-page-btn-archive ${
+                      isArchiveLoading ? "loading" : ""
+                    }`}
                     disabled={isArchiveLoading || isDisabled}
                     onClick={() => showArchive(company.name)}
                   >
                     {isArchiveLoading && !isDisabled ? (
                       <>
-                        <span className={`processing-page-stage-status  loading`}>⟳</span>
-                        <span className="processing-page-btn-text">加载中...</span>
+                        <span
+                          className={`processing-page-stage-status  loading`}
+                        >
+                          ⟳
+                        </span>
+                        <span className="processing-page-btn-text">
+                          加载中...
+                        </span>
                       </>
                     ) : (
                       <>
@@ -1865,7 +2282,8 @@ const ProcessingPage: React.FC = () => {
 
       <div id="pagination" className="processing-page-pagination">
         <span className="processing-page-pagination-info">
-          第 {start + 1}-{Math.min(end, filteredData.length)} 条 | 共 {filteredData.length} 条
+          第 {start + 1}-{Math.min(end, filteredData.length)} 条 | 共{" "}
+          {filteredData.length} 条
         </span>
         <button
           className="processing-page-page-btn"
@@ -1877,18 +2295,22 @@ const ProcessingPage: React.FC = () => {
         >
           {"< 上一页"}
         </button>
-        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((i) => (
-          <button
-            key={i}
-            className={`processing-page-page-btn ${currentPage === i ? "active" : ""}`}
-            onClick={() => {
-              setCurrentPage(i);
-              containerRef.current?.scrollTo(0, 0);
-            }}
-          >
-            {i}
-          </button>
-        ))}
+        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(
+          (i) => (
+            <button
+              key={i}
+              className={`processing-page-page-btn ${
+                currentPage === i ? "active" : ""
+              }`}
+              onClick={() => {
+                setCurrentPage(i);
+                containerRef.current?.scrollTo(0, 0);
+              }}
+            >
+              {i}
+            </button>
+          )
+        )}
         <button
           className="processing-page-page-btn"
           disabled={currentPage === totalPages}
@@ -1902,11 +2324,20 @@ const ProcessingPage: React.FC = () => {
       </div>
 
       {archiveShown && selectedArchive && (
-        <div className="processing-page-archive-modal show" onClick={closeArchive}>
-          <div className="processing-page-archive-container" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="processing-page-archive-modal show"
+          onClick={closeArchive}
+        >
+          <div
+            className="processing-page-archive-container"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="processing-page-archive-header">
               <h2 id="archiveTitle">{selectedArchive.name} - 企业档案</h2>
-              <button className="processing-page-archive-close" onClick={closeArchive}>
+              <button
+                className="processing-page-archive-close"
+                onClick={closeArchive}
+              >
                 ✕
               </button>
             </div>
@@ -1916,10 +2347,16 @@ const ProcessingPage: React.FC = () => {
               dangerouslySetInnerHTML={{ __html: selectedArchive.content }}
             />
             <div className="processing-page-archive-footer">
-              <button className="processing-page-btn-copy" onClick={copyArchive}>
+              <button
+                className="processing-page-btn-copy"
+                onClick={copyArchive}
+              >
                 复制全部内容
               </button>
-              <button className="processing-page-btn-close" onClick={closeArchive}>
+              <button
+                className="processing-page-btn-close"
+                onClick={closeArchive}
+              >
                 关闭
               </button>
             </div>

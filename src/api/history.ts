@@ -94,6 +94,7 @@ export interface UserRequestRecord {
   salesRecommendation?: string;
   customerDoc?: string;
   map?: Record<string, any>;
+  pushData?: string;
 }
 
 /**

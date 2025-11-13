@@ -155,6 +155,7 @@ body {
 /* 进行中会话呼吸动效 */
 .session-card.processing {
   animation: breathingCard 3s ease-in-out infinite;
+  cursor: not-allowed;
 }
 
 @keyframes breathingCard {
