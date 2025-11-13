@@ -187,6 +187,7 @@ body {
 }
 
 .more-btn {
+  position: relative;
   padding: 4px 8px;
   background: transparent;
   border: none;
@@ -228,7 +229,7 @@ body {
 .dropdown-menu {
   position: absolute;
   top: 40px;
-  right: 16px;
+  left: -140px;
   background: white;
   border: 1px solid #e8e8e8;
   border-radius: 8px;

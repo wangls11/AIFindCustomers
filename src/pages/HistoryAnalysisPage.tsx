@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { getRequest, UserRequest } from "@/api/history";
+import {
+  deleteRequest,
+  getRequest,
+  updateRequest,
+  UserRequest,
+} from "@/api/history";
 import "./HistoryAnalysisPage.css";
+import { Toast } from "@douyinfe/semi-ui";
 
 const HistoryAnalysisPage = () => {
   const navigate = useNavigate();
@@ -71,6 +77,10 @@ const HistoryAnalysisPage = () => {
     progress: "",
   });
 
+  // loading states for modal actions
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   // 分页状态
@@ -103,8 +113,7 @@ const HistoryAnalysisPage = () => {
   const mapUserRequestToSession = (r: UserRequest) => {
     const id =
       r.id ?? (r.sessionId as any) ?? Math.random().toString(36).slice(2);
-    let name = `会话 ${id}`;
-
+    let name = r.title || `会话 ${id}`;
     try {
       if (r.param) {
         if (typeof r.param === "string") {
@@ -124,13 +133,9 @@ const HistoryAnalysisPage = () => {
 
     const rawStatus = (r.status || "").toString().toLowerCase();
     let status: "0" | "1" | "2" | string = "0";
-    if (rawStatus.includes("pause") || rawStatus.includes("paused"))
+    if (rawStatus.includes("abort") || rawStatus.includes("disconnect"))
       status = "1";
-    else if (
-      rawStatus.includes("complete") ||
-      rawStatus.includes("done") ||
-      rawStatus.includes("success")
-    )
+    else if (rawStatus.includes("terminate") || rawStatus.includes("end"))
       status = "2";
     else status = "0";
 
@@ -236,7 +241,7 @@ const HistoryAnalysisPage = () => {
 
   // ======================== Actions ========================
   const goBack = () => navigate(-1);
-  const startNewAnalysis = () => console.log("开始新分析");
+  const startNewAnalysis = () => navigate("/select-plan");
   const openSession = (id: number | string, status: string) => {
     console.log("打开会话:", id, "状态:", status);
   };
@@ -283,27 +288,51 @@ const HistoryAnalysisPage = () => {
     // update the correct status list
     const status = currentSessionStatus;
     if (status) {
-      setSessionsMap((prev) => ({
-        ...prev,
-        [status]: (prev[status] || []).map((session) =>
-          session.id === currentSessionId
-            ? { ...session, name: newName }
-            : session
-        ),
-      }));
+      setRenameLoading(true);
+      updateRequest(currentSessionId + "", newName)
+        .then(() => {
+          Toast.success("重命名成功");
+          setSessionsMap((prev) => ({
+            ...prev,
+            [status]: (prev[status] || []).map((session) =>
+              session.id === currentSessionId
+                ? { ...session, name: newName }
+                : session
+            ),
+          }));
+        })
+        .catch((err) => {
+          Toast.error("重命名失败");
+        })
+        .finally(() => {
+          setRenameLoading(false);
+          closeRenameModal();
+        });
     } else {
       // fallback: update across all lists
-      setSessionsMap((prev) => {
-        const next: Record<string, Session[]> = { ...prev };
-        Object.keys(next).forEach((k) => {
-          next[k] = next[k].map((s) =>
-            s.id === currentSessionId ? { ...s, name: newName } : s
-          );
+
+      setRenameLoading(true);
+      updateRequest(currentSessionId + "", newName)
+        .then(() => {
+          Toast.success("重命名成功");
+          setSessionsMap((prev) => {
+            const next: Record<string, Session[]> = { ...prev };
+            Object.keys(next).forEach((k) => {
+              next[k] = next[k].map((s) =>
+                s.id === currentSessionId ? { ...s, name: newName } : s
+              );
+            });
+            return next;
+          });
+        })
+        .catch(() => {
+          Toast.error("重命名失败");
+        })
+        .finally(() => {
+          setRenameLoading(false);
+          closeRenameModal();
         });
-        return next;
-      });
     }
-    closeRenameModal();
   };
 
   const openDeleteModal = (
@@ -333,22 +362,93 @@ const HistoryAnalysisPage = () => {
     // remove from the correct status list
     const status = currentSessionStatus;
     if (status) {
-      setSessionsMap((prev) => ({
-        ...prev,
-        [status]: (prev[status] || []).filter(
-          (session) => session.id !== currentSessionId
-        ),
-      }));
-    } else {
-      setSessionsMap((prev) => {
-        const next: Record<string, Session[]> = { ...prev };
-        Object.keys(next).forEach((k) => {
-          next[k] = next[k].filter((s) => s.id !== currentSessionId);
+      setDeleteLoading(true);
+      deleteRequest(currentSessionId + "")
+        .then(() => {
+          Toast.success("删除记录成功");
+          // remove locally and decrement total for the status
+          setSessionsMap((prev) => {
+            const nextList = (prev[status] || []).filter(
+              (session) => session.id !== currentSessionId
+            );
+            const next: Record<string, Session[]> = {
+              ...prev,
+              [status]: nextList,
+            };
+
+            // if this page becomes empty and we have earlier pages, fetch the previous page
+            const currentPage = pageMap[status] ?? 1;
+            if (nextList.length === 0 && currentPage > 1) {
+              const prevPage = currentPage - 1;
+              setPageMap((p) => ({ ...p, [status]: prevPage }));
+              // fetch previous page to refill
+              fetchSessions(status, prevPage);
+            }
+
+            return next;
+          });
+
+          setTotalsMap((t) => ({
+            ...t,
+            [status]: Math.max(0, (t[status] ?? 0) - 1),
+          }));
+        })
+        .catch(() => {
+          Toast.error("删除记录失败");
+        })
+        .finally(() => {
+          setDeleteLoading(false);
+          closeDeleteModal();
         });
-        return next;
-      });
+    } else {
+      setDeleteLoading(true);
+      deleteRequest(currentSessionId + "")
+        .then(() => {
+          // remove from any list that contains the id, decrement totals accordingly,
+          // and if any list becomes empty while page > 1, fetch previous page for that list.
+          setSessionsMap((prev) => {
+            const next: Record<string, Session[]> = { ...prev };
+            const removedFrom: string[] = [];
+
+            Object.keys(next).forEach((k) => {
+              const before = prev[k] || [];
+              const after = before.filter((s) => s.id !== currentSessionId);
+              if (after.length !== before.length) removedFrom.push(k);
+              next[k] = after;
+            });
+
+            // optimistic totals update for all affected statuses
+            if (removedFrom.length) {
+              setTotalsMap((t) => {
+                const nextTotals = { ...t };
+                removedFrom.forEach((k) => {
+                  nextTotals[k] = Math.max(0, (nextTotals[k] ?? 0) - 1);
+                });
+                return nextTotals;
+              });
+            }
+
+            // for any affected list that became empty and had previous pages, fetch previous page
+            removedFrom.forEach((k) => {
+              const page = pageMap[k] ?? 1;
+              if ((next[k] || []).length === 0 && page > 1) {
+                const prevPage = page - 1;
+                setPageMap((p) => ({ ...p, [k]: prevPage }));
+                fetchSessions(k, prevPage);
+              }
+            });
+
+            return next;
+          });
+        })
+        .catch(() => {
+          Toast.error("删除记录失败");
+        })
+        .finally(() => {
+          setDeleteLoading(false);
+          closeDeleteModal();
+        });
     }
-    closeDeleteModal();
   };
 
   const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -441,40 +541,40 @@ const HistoryAnalysisPage = () => {
                       onClick={(e) => toggleMenu(e, session.id)}
                     >
                       ⋯
+                      <div
+                        className={`dropdown-menu ${
+                          activeMenuId === session.id ? "show" : ""
+                        }`}
+                      >
+                        <div
+                          className="menu-item"
+                          onClick={(e) =>
+                            openRenameModal(
+                              e,
+                              session.id,
+                              session.name,
+                              session.status
+                            )
+                          }
+                        >
+                          <span className="menu-icon">✏️</span>重命名
+                        </div>
+                        <div
+                          className="menu-item danger"
+                          onClick={(e) =>
+                            openDeleteModal(
+                              e,
+                              session.id,
+                              session.name,
+                              `${session.progress}/${session.total}`,
+                              session.status
+                            )
+                          }
+                        >
+                          <span className="menu-icon">🗑️</span>删除会话
+                        </div>
+                      </div>
                     </button>
-                    <div
-                      className={`dropdown-menu ${
-                        activeMenuId === session.id ? "show" : ""
-                      }`}
-                    >
-                      <div
-                        className="menu-item"
-                        onClick={(e) =>
-                          openRenameModal(
-                            e,
-                            session.id,
-                            session.name,
-                            session.status
-                          )
-                        }
-                      >
-                        <span className="menu-icon">✏️</span>重命名
-                      </div>
-                      <div
-                        className="menu-item danger"
-                        onClick={(e) =>
-                          openDeleteModal(
-                            e,
-                            session.id,
-                            session.name,
-                            `${session.progress}/${session.total}`,
-                            session.status
-                          )
-                        }
-                      >
-                        <span className="menu-icon">🗑️</span>删除会话
-                      </div>
-                    </div>
                   </div>
 
                   <div className="card-info">
@@ -538,8 +638,12 @@ const HistoryAnalysisPage = () => {
             <button className="modal-btn" onClick={closeRenameModal}>
               取消
             </button>
-            <button className="modal-btn primary" onClick={saveRename}>
-              保存
+            <button
+              className="modal-btn primary"
+              onClick={saveRename}
+              disabled={renameLoading}
+            >
+              {renameLoading ? "保存中..." : "保存"}
             </button>
           </div>
         </div>
@@ -568,8 +672,12 @@ const HistoryAnalysisPage = () => {
             <button className="modal-btn" onClick={closeDeleteModal}>
               取消
             </button>
-            <button className="modal-btn danger" onClick={confirmDelete}>
-              确认删除
+            <button
+              className="modal-btn danger"
+              onClick={confirmDelete}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? "删除中..." : "确认删除"}
             </button>
           </div>
         </div>

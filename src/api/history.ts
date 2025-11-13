@@ -33,6 +33,7 @@ export interface UserRequest {
   planeId?: string;
   fieldList?: string;
   sessionId?: string;
+  title?: string;
   map?: Record<string, any>;
 }
 
@@ -110,4 +111,37 @@ export function getRecord(payload: RecordPageDTO) {
       },
     }
   );
+}
+
+/**
+ * 删除会话记录
+ * @param requestId
+ * @returns
+ */
+export function deleteRequest(requestId: string) {
+  const params = new URLSearchParams();
+  params.append("requestId", requestId);
+
+  return post<ResultVO<unknown>>("/api/data/deleteRequest", params, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+}
+
+/**
+ * 重命名会话标题
+ * @param
+ * @returns
+ */
+export function updateRequest(requestId: string, title: string) {
+  const params = new URLSearchParams();
+  params.append("requestId", requestId);
+  params.append("title", title);
+
+  return post<ResultVO<unknown>>("/api/data/updateTitle", params, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
 }

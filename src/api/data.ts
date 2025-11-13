@@ -18,6 +18,7 @@ export interface DataDTO {
   appToken?: string;
   tableId?: string;
   viewId?: string;
+  title?: string;
   // 分析方案id
   userAnalysisId?: string;
   // 数据表中所有的字段名

@@ -381,9 +381,21 @@ const ProcessingPage: React.FC = () => {
           // 保存 tableId 到 state
           setCurrentTableId(res.tableId || "");
 
+          const tableInfo = await sdk.base.getTableMetaById(res.tableId || "");
+          const view = await table.getViewMetaById(res.viewId || "");
+          const tableName = tableInfo ? tableInfo.name : ""; // 数据表名称
+          const viewName = view ? view.name : "";
+
+          // 获取多维表格名称（如果支持）
+          // const baseName = await getBaseNameById(baseId); // 假设有一个获取多维表格名称的接口
+
+          // 获取视图名称（如果支持）
+          // const viewName = await getViewNameById(viewId); // 假设有一个获取视图名称的接口
+
           recordAllCount.current = recordsWithFields.length;
           startProcessing({
             appToken: extractDynamicId(bitableUrl) || "",
+            title: tableName + "-" + viewName,
             tableId: res.tableId || "",
             viewId: res.viewId || "",
             userAnalysisId: res.id || "",
