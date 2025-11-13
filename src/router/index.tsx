@@ -8,6 +8,7 @@ import CompletePage from "../pages/CompletePage";
 import HistoryAnalysisPage from "@/pages/HistoryAnalysisPage";
 import PurchaseCreditsPage from "@/pages/PurchaseCreditsPage";
 import CreditsDetailPage from "@/pages/CreditsDetailPage";
+import HelpAndFeedbackPage from "@/pages/HelpAndFeedbackPage";
 
 const router = createBrowserRouter([
   {
@@ -42,6 +43,10 @@ const router = createBrowserRouter([
       {
         path: "history",
         element: <HistoryAnalysisPage />,
+      },
+      {
+        path: "help-feedback",
+        element: <HelpAndFeedbackPage />,
       },
     ],
   },
