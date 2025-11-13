@@ -1,0 +1,569 @@
+.credits-detail-page .container {
+  background: #f5f5f5;
+}
+
+/* 顶部导航栏 */
+.credits-detail-page .header {
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.credits-detail-page .header-left {
+  display: flex;
+  align-items: center;
+}
+
+.credits-detail-page .back-btn {
+  font-size: 18px;
+  color: #333;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: color 0.2s ease;
+}
+
+.credits-detail-page .header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.credits-detail-page .menu-btn {
+  font-size: 20px;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.credits-detail-page .menu-btn:hover {
+  color: #1890ff;
+}
+
+/* 余额卡片 */
+.credits-detail-page .balance-card {
+  background: white;
+  margin: 16px 20px;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.credits-detail-page .balance-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.credits-detail-page .balance-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.credits-detail-page .balance-label {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.credits-detail-page .balance-amount {
+  font-size: 36px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+
+.credits-detail-page .balance-amount span {
+  font-size: 16px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.credits-detail-page .balance-desc {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 20px;
+}
+
+.credits-detail-page .balance-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.credits-detail-page .action-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+.credits-detail-page .action-btn.primary {
+  background: #1a1a1a;
+  color: white;
+}
+
+.credits-detail-page .action-btn.primary:hover {
+  background: #333;
+  transform: translateY(-1px);
+}
+
+.credits-detail-page .action-btn.secondary {
+  background: white;
+  color: #1a1a1a;
+  border: 1.5px solid #1a1a1a;
+}
+
+.credits-detail-page .action-btn.secondary:hover {
+  background: #1a1a1a;
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* 筛选栏 */
+.credits-detail-page .filter-section {
+  background: white;
+  margin: 0 20px 16px;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.credits-detail-page .filter-title {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.credits-detail-page .filter-title::before {
+  content: "📋";
+  margin-right: 6px;
+}
+
+.credits-detail-page .filter-tabs {
+  display: flex;
+  gap: 16px;
+}
+
+.credits-detail-page .filter-tab {
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.credits-detail-page .filter-tab:hover {
+  color: #1890ff;
+}
+
+.credits-detail-page .filter-tab.active {
+  color: #1890ff;
+  border-bottom-color: #1890ff;
+  font-weight: 600;
+}
+
+/* 记录列表 */
+.credits-detail-page .records-section {
+  padding: 0 20px 20px;
+}
+
+.credits-detail-page .date-group {
+  margin-bottom: 16px;
+}
+
+.credits-detail-page .date-header {
+  font-size: 13px;
+  color: #999;
+  padding: 8px 0;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.credits-detail-page .record-item {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.credits-detail-page .record-item:hover {
+  background: #f0f0f0;
+  border-color: #e8e8e8;
+  transform: translateY(-1px);
+}
+
+.credits-detail-page .record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.credits-detail-page .record-title {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  flex: 1;
+}
+
+.credits-detail-page .record-icon {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+.credits-detail-page .record-amount {
+  font-size: 16px;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.credits-detail-page .record-amount.income {
+  color: #52c41a;
+}
+
+.credits-detail-page .record-amount.expense {
+  color: #ff4d4f;
+}
+
+.credits-detail-page .record-time {
+  font-size: 13px;
+  color: #999;
+}
+
+.credits-detail-page .record-code {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* 空状态 */
+.credits-detail-page .empty-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.credits-detail-page .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.credits-detail-page .empty-title {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.credits-detail-page .empty-desc {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.credits-detail-page .empty-btn {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #1a1a1a;
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  border: none;
+}
+
+.credits-detail-page .empty-btn:hover {
+  background: #333;
+  transform: translateY(-1px);
+}
+
+/* 加载更多 */
+.credits-detail-page .load-more {
+  text-align: center;
+  padding: 20px;
+}
+
+.credits-detail-page .load-more-btn {
+  padding: 10px 24px;
+  background: white;
+  color: #666;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.credits-detail-page .load-more-btn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  transform: translateY(-1px);
+}
+
+/* 邀请码弹窗 */
+.credits-detail-page .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.credits-detail-page .modal-overlay.show {
+  display: flex;
+}
+
+.credits-detail-page .modal {
+  background: white;
+  border-radius: 12px;
+  padding: 32px 24px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  animation: slideUp 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.credits-detail-page .modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 24px;
+}
+
+.credits-detail-page .modal-title::before {
+  content: "🎁";
+  margin-right: 8px;
+}
+
+.credits-detail-page .modal-input {
+  width: 100%;
+  height: 48px;
+  border: 1.5px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-size: 15px;
+  margin-bottom: 20px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.credits-detail-page .modal-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.credits-detail-page .modal-tips {
+  background: #f6ffed;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  text-align: left;
+  border-left: 4px solid #52c41a;
+}
+
+.credits-detail-page .modal-tips-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #52c41a;
+  margin-bottom: 8px;
+}
+
+.credits-detail-page .modal-tips-list {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.8;
+}
+
+.credits-detail-page .modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.credits-detail-page .modal-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+.credits-detail-page .modal-btn.cancel {
+  background: white;
+  color: #666;
+  border: 1px solid #e8e8e8;
+}
+
+.credits-detail-page .modal-btn.cancel:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  background: #f8f9fa;
+}
+
+.credits-detail-page .modal-btn.confirm {
+  background: #1a1a1a;
+  color: white;
+}
+
+.credits-detail-page .modal-btn.confirm:hover {
+  background: #333;
+  transform: translateY(-1px);
+}
+
+.credits-detail-page .modal-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 成功弹窗 */
+.credits-detail-page .success-modal .modal-title::before {
+  content: "✅";
+}
+
+.credits-detail-page .success-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: bounce 0.6s ease;
+}
+
+.credits-detail-page .success-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #52c41a;
+  margin-bottom: 16px;
+}
+
+.credits-detail-page .success-desc {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes bounce {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+/* 响应式 */
+@media (max-width: 480px) {
+  .credits-detail-page .balance-card {
+    margin: 12px 16px;
+    padding: 20px;
+  }
+
+  .credits-detail-page .filter-section {
+    margin: 0 16px 12px;
+  }
+
+  .credits-detail-page .records-section {
+    padding: 0 16px 16px;
+  }
+
+  .credits-detail-page .header {
+    padding: 12px 16px;
+  }
+
+  .credits-detail-page .modal {
+    padding: 24px 20px;
+    margin: 20px;
+  }
+
+  .credits-detail-page .balance-amount {
+    font-size: 32px;
+  }
+
+  .credits-detail-page .success-amount {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 360px) {
+  .credits-detail-page .balance-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .credits-detail-page .action-btn {
+    height: 40px;
+  }
+
+  .credits-detail-page .filter-tabs {
+    gap: 12px;
+  }
+
+  .credits-detail-page .modal-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

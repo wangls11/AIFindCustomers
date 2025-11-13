@@ -45,7 +45,16 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
     }
   };
 
-  const showInviteCode = () => {
+  const goToPricing = () => {
+    closeMenu();
+    try {
+      navigate("/recharge");
+    } catch (_) {
+      window.location.href = "/recharge";
+    }
+  };
+
+  const goToHistory = () => {
     closeMenu();
     try {
       window.dispatchEvent(new CustomEvent("open-invite-code"));
@@ -116,12 +125,7 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
       `}</style>
 
       <div style={{ position: "relative" }}>
-        <button
-          className="icon"
-          aria-label="菜单"
-          ref={menuButtonRef}
-          onClick={toggleMenu}
-        >
+        <button className="icon" aria-label="菜单" ref={menuButtonRef} onClick={toggleMenu}>
           ☰
         </button>
 
@@ -138,18 +142,12 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
             </div>
           </div> */}
 
-          <div
-            className="menu-item"
-            onClick={() => navigateTo("/credits")}
-            role="menuitem"
-          >
+          <div className="menu-item" onClick={() => navigateTo("/credits")} role="menuitem">
             <div className="menu-item-icon">💎</div>
             <div className="menu-item-content">
               <div className="menu-item-title">我的积分</div>
               <div className="menu-item-desc">
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <div style={{ fontSize: 13, color: "#666" }}>当前积分:</div>
                   <div className="credits">{credits.toLocaleString()} 积分</div>
                 </div>
@@ -157,11 +155,7 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
             </div>
           </div>
 
-          <div
-            className="menu-item"
-            onClick={() => navigateTo("/history")}
-            role="menuitem"
-          >
+          <div className="menu-item" onClick={() => navigateTo("/history")} role="menuitem">
             <div className="menu-item-icon">📋</div>
             <div className="menu-item-content">
               <div className="menu-item-title">历史分析</div>
@@ -169,11 +163,7 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
             </div>
           </div>
 
-          <div
-            className="menu-item"
-            onClick={() => navigateTo("/recharge")}
-            role="menuitem"
-          >
+          <div className="menu-item" onClick={() => navigateTo("/recharge")} role="menuitem">
             <div className="menu-item-icon">💳</div>
             <div className="menu-item-content">
               <div className="menu-item-title">充值购买</div>
@@ -181,7 +171,7 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
             </div>
           </div>
 
-          <div className="menu-item" onClick={showInviteCode} role="menuitem">
+          <div className="menu-item" onClick={() => navigate("/invite")} role="menuitem">
             <div className="menu-item-icon">🎁</div>
             <div className="menu-item-content">
               <div className="menu-item-title">使用邀请码</div>
@@ -189,11 +179,7 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
             </div>
           </div>
 
-          <div
-            className="menu-item"
-            onClick={() => navigateTo("/help")}
-            role="menuitem"
-          >
+          <div className="menu-item" onClick={() => navigateTo("/help")} role="menuitem">
             <div className="menu-item-icon">❓</div>
             <div className="menu-item-content">
               <div className="menu-item-title">帮助与反馈</div>
@@ -202,11 +188,7 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
           </div>
         </div>
 
-        <div
-          className={`overlay ${showMenu ? "show" : ""}`}
-          onClick={closeMenu}
-          aria-hidden
-        />
+        <div className={`overlay ${showMenu ? "show" : ""}`} onClick={closeMenu} aria-hidden />
       </div>
     </>
   );

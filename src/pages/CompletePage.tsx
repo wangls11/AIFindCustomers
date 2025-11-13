@@ -7,8 +7,7 @@ const CompletePage: React.FC = () => {
   useEffect(() => {
     const applyMax = () => {
       const leftSidebar = (window as any).__LEFT_SIDEBAR_WIDTH__ || 280;
-      const pageWidth =
-        window.innerWidth || document.documentElement.clientWidth;
+      const pageWidth = window.innerWidth || document.documentElement.clientWidth;
       const maxW = Math.max(410, pageWidth - leftSidebar - 640);
     };
     applyMax();
@@ -449,10 +448,7 @@ const CompletePage: React.FC = () => {
         <button className="action-btn secondary" onClick={() => navigate("/")}>
           返回首页
         </button>
-        <button
-          className="action-btn primary"
-          onClick={() => navigate("/buy-credits")}
-        >
+        <button className="action-btn primary" onClick={() => navigate("/credits")}>
           查看积分购买
         </button>
       </div>

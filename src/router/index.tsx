@@ -5,8 +5,9 @@ import Home from "../pages/Home";
 import SelectPlanPage from "../pages/SelectPlanPage";
 import ProcessingPage from "../pages/ProcessingPage";
 import CompletePage from "../pages/CompletePage";
-import BuyCreditsPage from "../pages/BuyCreditsPage";
 import HistoryAnalysisPage from "@/pages/HistoryAnalysisPage";
+import PurchaseCreditsPage from "@/pages/PurchaseCreditsPage";
+import CreditsDetailPage from "@/pages/CreditsDetailPage";
 
 const router = createBrowserRouter([
   {
@@ -31,8 +32,12 @@ const router = createBrowserRouter([
         element: <CompletePage />,
       },
       {
-        path: "buy-credits",
-        element: <BuyCreditsPage />,
+        path: "credits",
+        element: <CreditsDetailPage />,
+      },
+      {
+        path: "recharge",
+        element: <PurchaseCreditsPage />,
       },
       {
         path: "history",
