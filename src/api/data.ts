@@ -125,3 +125,19 @@ export function startDataStream(
     onError,
   });
 }
+
+/**
+ * 获取已处理的公司数量
+ * POST /api/data/getCompanyCount
+ * Content-Type: application/x-www-form-urlencoded
+ * 无请求参数
+ */
+export function getCompanyCount() {
+  const params = new URLSearchParams();
+
+  return post<number>("/api/data/getCompanyCount", params, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+}

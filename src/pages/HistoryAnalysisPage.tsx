@@ -8,6 +8,7 @@ import {
 } from "@/api/history";
 import "./HistoryAnalysisPage.css";
 import { Toast } from "@douyinfe/semi-ui";
+import { getCompanyCount } from "@/api";
 
 const HistoryAnalysisPage = () => {
   const navigate = useNavigate();
@@ -92,6 +93,8 @@ const HistoryAnalysisPage = () => {
   const processingCount = totalsMap["0"] ?? sessionsMap["0"].length;
   const pausedCount = totalsMap["1"] ?? sessionsMap["1"].length;
   const completedCount = totalsMap["2"] ?? sessionsMap["2"].length;
+  // 公司总数
+  const [companyCount, setCompanyCount] = useState(0);
 
   // ======================== Hooks ========================
   useEffect(() => {
@@ -210,13 +213,19 @@ const HistoryAnalysisPage = () => {
     }
   };
 
+  const fetchCompanyCount = () => {
+    getCompanyCount().then((res) => {
+      setCompanyCount(res || 0);
+    });
+  };
+
   // fetch first page for all three statuses when filter changes or on mount so counts are available
   useEffect(() => {
     // initial load for all tabs so counts are displayed immediately
     fetchSessions("0", 1);
     fetchSessions("1", 1);
     fetchSessions("2", 1);
-
+    fetchCompanyCount();
     // keep behavior of switching to a tab: we already have first page, but if it's empty we let fetch handle it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -502,10 +511,12 @@ const HistoryAnalysisPage = () => {
         <div className="stats-section">
           <div className="stats-title">📊 数据统计</div>
           <div className="stats-item">
-            累计分析企业：<span className="stats-number">1,247</span> 家
+            累计分析企业：<span className="stats-number">{companyCount}</span>{" "}
+            家
           </div>
           <div className="stats-item">
-            已完成会话：<span className="stats-number">12</span> 个
+            已完成会话：<span className="stats-number">{completedCount}</span>{" "}
+            个
           </div>
         </div>
 
