@@ -207,7 +207,7 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = () => {
         <div className="modal-tips">
           <div className="modal-tips-title">💡 使用邀请码即可获得：</div>
           <div className="modal-tips-list">
-            • 免费领 200 积分（原价 ¥20）
+            • 免费领 100 积分（原价 ¥10）
             <br />• 可免费体验 8 家企业分析
           </div>
         </div>
