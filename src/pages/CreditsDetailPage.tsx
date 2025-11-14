@@ -90,44 +90,47 @@ const CreditsDetailPage: React.FC = () => {
         setDetailsLoading(false);
       }
     },
-    [currentPage, pageSize, detailsLoading],
+    [currentPage, pageSize, detailsLoading]
   );
 
   // 将API数据转换为页面需要的格式
-  const transformApiData = useCallback((apiData: CreditsDetailRecord[]): DateGroup[] => {
-    if (apiData.length === 0) return [];
+  const transformApiData = useCallback(
+    (apiData: CreditsDetailRecord[]): DateGroup[] => {
+      if (apiData.length === 0) return [];
 
-    // 按日期分组
-    const groupedByDate = apiData.reduce((groups, item) => {
-      const date = new Date().toLocaleDateString("zh-CN", {
-        month: "numeric",
-        day: "numeric",
-      });
-      if (!groups[date]) {
-        groups[date] = [];
-      }
-      groups[date].push({
-        id: item.id,
-        icon: getIconByBusinessType(item.businessType),
-        title: item.title,
-        amount: item.changeAmount || item.amount,
-        type: (item.changeAmount || item.amount) >= 0 ? "income" : "expense",
-        time: new Date().toLocaleString("zh-CN"), // 临时时间，需要后端提供
-        code: item.deductionNo,
-        businessType: item.businessType,
-        changeAmount: item.changeAmount || item.amount,
-        deductionNo: item.deductionNo,
-        businessId: item.businessId,
-      });
-      return groups;
-    }, {} as Record<string, RecordItem[]>);
+      // 按日期分组
+      const groupedByDate = apiData.reduce((groups, item) => {
+        const date = new Date().toLocaleDateString("zh-CN", {
+          month: "numeric",
+          day: "numeric",
+        });
+        if (!groups[date]) {
+          groups[date] = [];
+        }
+        groups[date].push({
+          id: item.id,
+          icon: getIconByBusinessType(item.businessType),
+          title: item.title,
+          amount: item.changeAmount || item.amount,
+          type: (item.changeAmount || item.amount) >= 0 ? "income" : "expense",
+          time: new Date().toLocaleString("zh-CN"), // 临时时间，需要后端提供
+          code: item.deductionNo,
+          businessType: item.businessType,
+          changeAmount: item.changeAmount || item.amount,
+          deductionNo: item.deductionNo,
+          businessId: item.businessId,
+        });
+        return groups;
+      }, {} as Record<string, RecordItem[]>);
 
-    // 转换为DateGroup数组
-    return Object.entries(groupedByDate).map(([date, items]) => ({
-      date,
-      items,
-    }));
-  }, []);
+      // 转换为DateGroup数组
+      return Object.entries(groupedByDate).map(([date, items]) => ({
+        date,
+        items,
+      }));
+    },
+    []
+  );
 
   // 根据业务类型获取图标
   const getIconByBusinessType = useCallback((businessType: string): string => {
@@ -265,7 +268,9 @@ const CreditsDetailPage: React.FC = () => {
             {detailsLoading ? "正在加载..." : "暂时没有相关的积分记录"}
           </div>
           {!detailsLoading && (
-            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+            <div
+              style={{ display: "flex", gap: "12px", justifyContent: "center" }}
+            >
               <button className="empty-btn secondary" onClick={refreshData}>
                 刷新
               </button>
@@ -294,9 +299,13 @@ const CreditsDetailPage: React.FC = () => {
                 </div>
                 <div className="record-time">{item.time}</div>
                 {item.businessType && (
-                  <div className="record-code">业务类型：{item.businessType}</div>
+                  <div className="record-code">
+                    业务类型：{item.businessType}
+                  </div>
                 )}
-                {item.deductionNo && <div className="record-code">单号：{item.deductionNo}</div>}
+                {item.deductionNo && (
+                  <div className="record-code">单号：{item.deductionNo}</div>
+                )}
               </div>
             ))}
           </div>
@@ -305,7 +314,11 @@ const CreditsDetailPage: React.FC = () => {
         {/* 加载更多 */}
         {hasMore && (
           <div className="load-more">
-            <button className="load-more-btn" onClick={loadMore} disabled={detailsLoading}>
+            <button
+              className="load-more-btn"
+              onClick={loadMore}
+              disabled={detailsLoading}
+            >
               {detailsLoading ? "加载中..." : "加载更多"}
             </button>
           </div>
@@ -338,7 +351,12 @@ const CreditsDetailPage: React.FC = () => {
         {/* 顶部导航 */}
         <div className="header">
           <div className="header-left">
-            <button className="back-btn" onClick={goBack} aria-label="返回上一页" type="button">
+            <button
+              className="back-btn"
+              onClick={goBack}
+              aria-label="返回上一页"
+              type="button"
+            >
               ←
             </button>
             <div className="header-title">积分明细</div>
@@ -359,10 +377,18 @@ const CreditsDetailPage: React.FC = () => {
             </div>
           )}
           <div className="balance-actions">
-            <button className="action-btn primary" onClick={goToRecharge} type="button">
+            <button
+              className="action-btn primary"
+              onClick={goToRecharge}
+              type="button"
+            >
               充值购买
             </button>
-            <button className="action-btn secondary" onClick={showInviteCodeModal} type="button">
+            <button
+              className="action-btn secondary"
+              onClick={showInviteCodeModal}
+              type="button"
+            >
               使用邀请码
             </button>
           </div>
@@ -389,7 +415,9 @@ const CreditsDetailPage: React.FC = () => {
         visible={showInviteModal}
         onCancel={closeInviteCodeModal}
         footer={
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <div
+            style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}
+          >
             <Button onClick={closeInviteCodeModal}>取消</Button>
             <Button
               theme="solid"

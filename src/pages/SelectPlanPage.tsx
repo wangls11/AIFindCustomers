@@ -8,6 +8,7 @@ import {
   UserAnalysisPlanVO,
 } from "@/api";
 import MenuButtonWithDropdown from "@/components/MenuButtonWithDropdown";
+import { Toast } from "@douyinfe/semi-ui";
 
 type AppState = {
   selectedTable: string | null;
@@ -816,7 +817,7 @@ const SelectPlanPage: React.FC = () => {
                           ) {
                             toggleTag(prop, "valueProp");
                           } else {
-                            window.alert("最多只能选择 3 个选项");
+                            Toast.error("最多只能选择 3 个选项");
                           }
                         }}
                       >
@@ -831,7 +832,7 @@ const SelectPlanPage: React.FC = () => {
                         if (showOtherInputs.valueProp || valuePropsCount < 3) {
                           toggleTag("其他", "valueProp", true);
                         } else {
-                          window.alert("最多只能选择 3 个选项");
+                          Toast.error("最多只能选择 3 个选项");
                         }
                       }}
                     >

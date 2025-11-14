@@ -158,6 +158,7 @@ const HistoryAnalysisPage = () => {
       completeTime,
       tableId: r.tableId,
       viewId: r.viewId,
+      baseToken: r.baseToken,
     };
   };
 
@@ -266,6 +267,7 @@ const HistoryAnalysisPage = () => {
         requestId: data.id,
         status: data.status,
         total: data.total,
+        baseToken: data.baseToken,
       },
     });
   };
@@ -308,7 +310,7 @@ const HistoryAnalysisPage = () => {
 
   const saveRename = () => {
     const newName = renameValue.trim();
-    if (!newName) return alert("名称不能为空");
+    if (!newName) return Toast.error("名称不能为空");
     // update the correct status list
     const status = currentSessionStatus;
     if (status) {
@@ -490,6 +492,16 @@ const HistoryAnalysisPage = () => {
     }
   };
 
+  const emptyFunction = (currentFilter: string) => {
+    if (currentFilter === "0") {
+      return "🟢暂无正在分析的任务";
+    } else if (currentFilter === "1") {
+      return "⏸️暂无已暂停的任务";
+    } else if (currentFilter === "2") {
+      return "✅暂无已完成的任务";
+    }
+  };
+
   // ======================== Render ========================
   return (
     <>
@@ -545,11 +557,11 @@ const HistoryAnalysisPage = () => {
         {/* 列表内容 */}
         <div className="content">
           {loadingMap[currentFilter] ? (
-            <div style={{ padding: 20, color: "#666" }}>加载中...</div>
-          ) : error ? (
-            <div style={{ padding: 20, color: "#ff4d4f" }}>错误：{error}</div>
+            <div className="center-placeholder loading">加载中...</div>
           ) : filteredSessions.length === 0 ? (
-            <div style={{ padding: 20, color: "#999" }}>暂无数据</div>
+            <div className="center-placeholder empty">
+              {emptyFunction(currentFilter)}
+            </div>
           ) : (
             <>
               {filteredSessions.map((session) => (

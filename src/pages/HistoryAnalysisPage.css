@@ -135,6 +135,24 @@ body {
   padding: 16px;
 }
 
+/* 占位（空态 / 加载）居中显示 */
+.center-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  min-height: 40vh; /* ensures vertical centering even when content area is short */
+}
+
+.center-placeholder.loading {
+  color: #666;
+}
+
+.center-placeholder.empty {
+  color: #999;
+}
+
 /* 会话卡片 */
 .session-card {
   background: white;
@@ -219,6 +237,9 @@ body {
   line-height: 1.8;
   display: flex;
   align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
 }
 
 .info-icon {
