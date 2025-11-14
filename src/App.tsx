@@ -4,6 +4,7 @@ import { RouterProvider } from "react-router";
 import router from "./router";
 import { getToken, initAuth } from "./utils/auth";
 import CenterLayout from "./components/CenterLayout";
+import { UserProvider } from "./contexts/UserContext";
 
 export default function App() {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -51,5 +52,9 @@ export default function App() {
   }
 
   // 正常渲染
-  return <RouterProvider router={router} />;
+  return (
+    <UserProvider>
+      <RouterProvider router={router} />
+    </UserProvider>
+  );
 }

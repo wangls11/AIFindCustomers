@@ -1,17 +1,29 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { Modal, Button, Input, Toast } from "@douyinfe/semi-ui";
 import "./CreditsDetailPage.css";
 import MenuButtonWithDropdown from "@/components/MenuButtonWithDropdown";
 import { useNavigate } from "react-router";
+import {
+  exchange,
+  getDetails,
+  type CreditsDetailRecord,
+  type CreditsDetailsResponse,
+} from "@/api/user";
+import { useUser } from "@/contexts/UserContext";
 
-// 类型定义
+// 类型定义 - 更新为与API数据匹配
 interface RecordItem {
-  id: number;
+  id: string;
   icon: string;
   title: string;
   amount: number;
   type: "income" | "expense";
   time: string;
   code?: string;
+  businessType: string; // 业务类型
+  changeAmount: number; // 变化金额
+  deductionNo?: string; // 扣除单号
+  businessId?: string; // 业务ID
 }
 
 interface DateGroup {
@@ -23,76 +35,116 @@ type FilterType = "all" | "income" | "expense";
 
 const CreditsDetailPage: React.FC = () => {
   const navigate = useNavigate();
+  const { userInfo, refreshUserInfo } = useUser();
   // 状态管理
-  const [balance, setBalance] = useState<number>(1250);
-  const [canAnalyze, setCanAnalyze] = useState<number>(50);
   const [currentFilter, setCurrentFilter] = useState<FilterType>("all");
   const [showInviteModal, setShowInviteModal] = useState<boolean>(false);
-  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [inviteCode, setInviteCode] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // 记录数据 - 使用useMemo优化性能
-  const records = useMemo<DateGroup[]>(
-    () => [
-      {
-        date: "11月12日",
-        items: [
-          {
-            id: 1,
-            icon: "📤",
-            title: "快速分析 - 客户线索总表",
-            amount: -25,
-            type: "expense",
-            time: "2025-11-12 14:30",
-          },
-          {
-            id: 2,
-            icon: "📤",
-            title: "快速分析 - 目标企业筛选",
-            amount: -25,
-            type: "expense",
-            time: "2025-11-12 10:15",
-          },
-        ],
-      },
-      {
-        date: "11月11日",
-        items: [
-          {
-            id: 3,
-            icon: "💳",
-            title: "购买标准包",
-            amount: 3300,
-            type: "income",
-            time: "2025-11-11 16:20",
-          },
-          {
-            id: 4,
-            icon: "🎁",
-            title: "赠送积分",
-            amount: 310,
-            type: "income",
-            time: "2025-11-11 16:20",
-          },
-        ],
-      },
-      {
-        date: "11月10日",
-        items: [
-          {
-            id: 5,
-            icon: "🎉",
-            title: "邀请码激活",
-            amount: 200,
-            type: "income",
-            time: "2025-11-10 09:00",
-            code: "AIZHAO2025",
-          },
-        ],
-      },
-    ],
-    [],
+  // 积分明细相关状态
+  const [detailsData, setDetailsData] = useState<CreditsDetailsResponse>({
+    total: 0,
+    dataList: [],
+  });
+  const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize] = useState<number>(10); // 每页数量
+  const [hasMore, setHasMore] = useState<boolean>(true);
+
+  useEffect(() => {
+    refreshUserInfo();
+    loadDetailsData();
+  }, []);
+
+  // 加载积分明细数据
+  const loadDetailsData = useCallback(
+    async (reset: boolean = false) => {
+      if (detailsLoading) return;
+
+      setDetailsLoading(true);
+      const page = reset ? 1 : currentPage;
+
+      try {
+        const data = await getDetails({
+          pageNO: page,
+          pageSize: pageSize,
+        });
+
+        setHasMore(page < Math.ceil(data.total / pageSize));
+
+        if (reset) {
+          setDetailsData(data);
+          setCurrentPage(2);
+        } else {
+          setDetailsData((prev) => ({
+            total: data.total,
+            dataList: [...prev.dataList, ...data.dataList],
+          }));
+          setCurrentPage((prev) => prev + 1);
+        }
+      } catch (error: any) {
+        console.error("获取积分明细失败:", error);
+        Toast.error({ content: "获取积分明细失败，请稍后重试" });
+      } finally {
+        setDetailsLoading(false);
+      }
+    },
+    [currentPage, pageSize, detailsLoading],
   );
+
+  // 将API数据转换为页面需要的格式
+  const transformApiData = useCallback((apiData: CreditsDetailRecord[]): DateGroup[] => {
+    if (apiData.length === 0) return [];
+
+    // 按日期分组
+    const groupedByDate = apiData.reduce((groups, item) => {
+      const date = new Date().toLocaleDateString("zh-CN", {
+        month: "numeric",
+        day: "numeric",
+      });
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push({
+        id: item.id,
+        icon: getIconByBusinessType(item.businessType),
+        title: item.title,
+        amount: item.changeAmount || item.amount,
+        type: (item.changeAmount || item.amount) >= 0 ? "income" : "expense",
+        time: new Date().toLocaleString("zh-CN"), // 临时时间，需要后端提供
+        code: item.deductionNo,
+        businessType: item.businessType,
+        changeAmount: item.changeAmount || item.amount,
+        deductionNo: item.deductionNo,
+        businessId: item.businessId,
+      });
+      return groups;
+    }, {} as Record<string, RecordItem[]>);
+
+    // 转换为DateGroup数组
+    return Object.entries(groupedByDate).map(([date, items]) => ({
+      date,
+      items,
+    }));
+  }, []);
+
+  // 根据业务类型获取图标
+  const getIconByBusinessType = useCallback((businessType: string): string => {
+    const iconMap: Record<string, string> = {
+      recharge: "💳", // 充值
+      consumption: "📤", // 消费
+      bonus: "🎁", // 赠送
+      invitation: "🎉", // 邀请
+      refund: "↩️", // 退款
+    };
+    return iconMap[businessType] || "📝";
+  }, []);
+
+  // 记录数据 - 使用useMemo优化性能，现在基于API数据
+  const records = useMemo<DateGroup[]>(() => {
+    return transformApiData(detailsData.dataList);
+  }, [detailsData.dataList, transformApiData]);
 
   // 筛选后的记录 - 使用useMemo优化性能
   const filteredRecords = useMemo(() => {
@@ -124,47 +176,46 @@ const CreditsDetailPage: React.FC = () => {
     setInviteCode("");
   }, []);
 
-  const activateInviteCode = useCallback(() => {
-    const trimmedCode = inviteCode.trim();
-    if (!trimmedCode) {
-      alert("请输入邀请码");
-      return;
-    }
-
-    // 模拟验证
-    if (trimmedCode === "AIZHAO2025") {
-      closeInviteCodeModal();
-      setShowSuccessModal(true);
-
-      // 更新余额
-      setTimeout(() => {
-        setBalance(1450);
-        setCanAnalyze(58);
-      }, 1000);
-    } else {
-      alert("邀请码无效或已被使用");
-    }
-  }, [inviteCode, closeInviteCodeModal]);
-
-  const closeSuccessModal = useCallback(() => {
-    setShowSuccessModal(false);
-    // 刷新页面或更新列表
-    window.location.reload();
-  }, []);
-
   const filterRecords = useCallback((type: FilterType) => {
     setCurrentFilter(type);
-    console.log("筛选类型:", type);
   }, []);
 
   const loadMore = useCallback(() => {
-    console.log("加载更多记录");
-    // TODO: 实现分页加载
+    if (hasMore && !detailsLoading) {
+      loadDetailsData(false);
+    }
+  }, [hasMore, detailsLoading, loadDetailsData]);
+
+  // 刷新数据
+  const refreshData = useCallback(() => {
+    setCurrentPage(1);
+    loadDetailsData(true);
+  }, [loadDetailsData]);
+
+  const handleInviteCodeChange = useCallback((value: string) => {
+    setInviteCode(value);
   }, []);
 
-  const handleInviteCodeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInviteCode(e.target.value.toUpperCase());
-  }, []);
+  const activateInviteCode = useCallback(async () => {
+    const trimmedCode = inviteCode.trim();
+    if (!trimmedCode) {
+      Toast.error({ content: "请输入邀请码" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await exchange(trimmedCode);
+      refreshUserInfo();
+      closeInviteCodeModal();
+      Toast.success({ content: "邀请码激活成功！" });
+    } catch (error: any) {
+      console.error("邀请码激活失败:", error);
+      Toast.error({ content: error.message || "邀请码无效或已被使用" });
+    } finally {
+      setLoading(false);
+    }
+  }, [inviteCode, closeInviteCodeModal]);
 
   // 渲染筛选标签
   const renderFilterTabs = useMemo(() => {
@@ -194,15 +245,32 @@ const CreditsDetailPage: React.FC = () => {
 
   // 渲染记录列表
   const renderRecords = useMemo(() => {
+    // 加载中状态
+    if (detailsLoading && currentPage === 1) {
+      return (
+        <div className="loading-state">
+          <div className="loading-spinner">⏳</div>
+          <div className="loading-text">正在加载积分明细...</div>
+        </div>
+      );
+    }
+
+    // 空数据状态
     if (filteredRecords.length === 0) {
       return (
         <div className="empty-state">
           <div className="empty-icon">📭</div>
           <div className="empty-title">暂无记录</div>
-          <div className="empty-desc">暂时没有相关的积分记录</div>
-          <button className="empty-btn" onClick={goToRecharge}>
-            立即充值
-          </button>
+          <div className="empty-desc">
+            {detailsLoading ? "正在加载..." : "暂时没有相关的积分记录"}
+          </div>
+          {!detailsLoading && (
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+              <button className="empty-btn secondary" onClick={refreshData}>
+                刷新
+              </button>
+            </div>
+          )}
         </div>
       );
     }
@@ -225,19 +293,44 @@ const CreditsDetailPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="record-time">{item.time}</div>
-                {item.code && <div className="record-code">邀请码：{item.code}</div>}
+                {item.businessType && (
+                  <div className="record-code">业务类型：{item.businessType}</div>
+                )}
+                {item.deductionNo && <div className="record-code">单号：{item.deductionNo}</div>}
               </div>
             ))}
           </div>
         ))}
-        <div className="load-more">
-          <button className="load-more-btn" onClick={loadMore}>
-            加载更多
-          </button>
-        </div>
+
+        {/* 加载更多 */}
+        {hasMore && (
+          <div className="load-more">
+            <button className="load-more-btn" onClick={loadMore} disabled={detailsLoading}>
+              {detailsLoading ? "加载中..." : "加载更多"}
+            </button>
+          </div>
+        )}
+
+        {/* 已加载完毕 */}
+        {!hasMore && detailsData.dataList.length > 0 && (
+          <div className="load-more">
+            <div className="load-more-text">已加载全部记录</div>
+            <button className="refresh-btn" onClick={refreshData}>
+              刷新
+            </button>
+          </div>
+        )}
       </>
     );
-  }, [filteredRecords, goToRecharge, loadMore]);
+  }, [
+    filteredRecords,
+    goToRecharge,
+    loadMore,
+    hasMore,
+    detailsLoading,
+    refreshData,
+    detailsData.dataList.length,
+  ]);
 
   return (
     <div className="credits-detail-page">
@@ -258,9 +351,13 @@ const CreditsDetailPage: React.FC = () => {
           <div className="balance-icon">💎</div>
           <div className="balance-label">当前积分余额</div>
           <div className="balance-amount">
-            {balance.toLocaleString()} <span>积分</span>
+            {userInfo?.integral.toLocaleString()} <span>积分</span>
           </div>
-          <div className="balance-desc">约可分析 {canAnalyze} 家企业</div>
+          {userInfo?.integral && (
+            <div className="balance-desc">
+              约可分析 {userInfo?.integral && userInfo.integral / 50} 家企业
+            </div>
+          )}
           <div className="balance-actions">
             <button className="action-btn primary" onClick={goToRecharge} type="button">
               充值购买
@@ -273,7 +370,12 @@ const CreditsDetailPage: React.FC = () => {
 
         {/* 筛选栏 */}
         <div className="filter-section">
-          <div className="filter-title">消费记录</div>
+          <div className="filter-title">
+            消费记录
+            <button className="refresh-icon" onClick={refreshData} title="刷新">
+              🔄
+            </button>
+          </div>
           <div className="filter-tabs">{renderFilterTabs}</div>
         </div>
 
@@ -282,72 +384,42 @@ const CreditsDetailPage: React.FC = () => {
       </div>
 
       {/* 邀请码弹窗 */}
-      <div
-        className={`modal-overlay ${showInviteModal ? "show" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="invite-modal-title"
-      >
-        <div className="modal">
-          <div id="invite-modal-title" className="modal-title">
-            使用邀请码
-          </div>
-          <input
-            type="text"
-            className="modal-input"
-            value={inviteCode}
-            onChange={handleInviteCodeChange}
-            placeholder="请输入邀请码"
-            maxLength={12}
-            aria-label="邀请码输入"
-          />
-          <div className="modal-tips">
-            <div className="modal-tips-title">💡 使用邀请码即可获得：</div>
-            <div className="modal-tips-list">
-              • 免费领 200 积分（原价 ¥20）
-              <br />• 可免费体验 8 家企业分析
-            </div>
-          </div>
-          <div className="modal-actions">
-            <button className="modal-btn cancel" onClick={closeInviteCodeModal} type="button">
-              取消
-            </button>
-            <button
-              className="modal-btn confirm"
+      <Modal
+        title="使用邀请码"
+        visible={showInviteModal}
+        onCancel={closeInviteCodeModal}
+        footer={
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <Button onClick={closeInviteCodeModal}>取消</Button>
+            <Button
+              theme="solid"
+              type="primary"
               onClick={activateInviteCode}
-              type="button"
-              disabled={!inviteCode.trim()}
+              disabled={!inviteCode.trim() || loading}
+              loading={loading}
             >
               确认激活
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
-
-      {/* 成功弹窗 */}
-      <div
-        className={`modal-overlay success-modal ${showSuccessModal ? "show" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="success-modal-title"
+        }
+        centered
       >
-        <div className="modal">
-          <div id="success-modal-title" className="modal-title">
-            激活成功！
-          </div>
-          <div className="success-icon">🎉</div>
-          <div className="success-amount">+200 积分已到账</div>
-          <div className="success-desc">现在就可以开始体验了</div>
-          <button
-            className="modal-btn confirm"
-            onClick={closeSuccessModal}
+        <div style={{ marginBottom: "16px" }}>
+          <Input
+            placeholder="请输入邀请码"
+            value={inviteCode}
+            onChange={handleInviteCodeChange}
             style={{ width: "100%" }}
-            type="button"
-          >
-            立即体验
-          </button>
+          />
         </div>
-      </div>
+        <div className="modal-tips">
+          <div className="modal-tips-title">💡 使用邀请码即可获得：</div>
+          <div className="modal-tips-list">
+            • 免费领 200 积分（原价 ¥20）
+            <br />• 可免费体验 8 家企业分析
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

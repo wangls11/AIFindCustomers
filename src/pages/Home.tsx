@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import "./Home.css";
+import "./Home.scss";
 import { bitable } from "@lark-base-open/js-sdk";
 import MenuButtonWithDropdown from "../components/MenuButtonWithDropdown";
 
 const AiZhaoKe: React.FC = () => {
   const [count, setCount] = useState(0);
-  const [companyList, setCompanyList] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const [companyList, setCompanyList] = useState<{ id: string; name: string }[]>([]);
 
   // 从飞书多维表拉取公司名称
   useEffect(() => {
@@ -16,9 +14,7 @@ const AiZhaoKe: React.FC = () => {
       try {
         const table = await bitable.base.getActiveTable();
         const fields = await table.getFieldMetaList();
-        const companyField = fields.find(
-          (field: any) => field.name === "企业名称"
-        );
+        const companyField = fields.find((field: any) => field.name === "企业名称");
         if (!companyField) {
           setCompanyList([]);
           return;
@@ -31,11 +27,9 @@ const AiZhaoKe: React.FC = () => {
           if (view && typeof view.getVisibleRecordIdList === "function") {
             const recordIds = await view.getVisibleRecordIdList();
             const id2record = Object.fromEntries(
-              res.records.map((rec: any) => [rec.recordId, rec])
+              res.records.map((rec: any) => [rec.recordId, rec]),
             );
-            orderedRecords = recordIds
-              .map((rid) => rid && id2record[rid])
-              .filter(Boolean);
+            orderedRecords = recordIds.map((rid) => rid && id2record[rid]).filter(Boolean);
           }
         }
         const companyNames = orderedRecords
@@ -87,7 +81,7 @@ const AiZhaoKe: React.FC = () => {
   };
 
   return (
-    <div className="panel">
+    <div className="project-home">
       <header className="top">
         <div className="logo">
           <img
@@ -112,8 +106,7 @@ const AiZhaoKe: React.FC = () => {
           <div className="badge">
             <span className="achievement-icon">🚀</span>
             <span>
-              已协助 <strong>{count.toLocaleString()}</strong>+ 位销售
-              找到目标客户
+              已协助 <strong>{count.toLocaleString()}</strong>+ 位销售 找到目标客户
             </span>
           </div>
           <span className="growth-tag">
@@ -131,17 +124,12 @@ const AiZhaoKe: React.FC = () => {
 
         <section className="co">
           <div className="co-h">
-            🔍{" "}
-            <div className="co-t">
-              检测到当前多维表中有{companyNames.length}家公司
-            </div>
+            🔍 <div className="co-t">检测到当前多维表中有{companyNames.length}家公司</div>
           </div>
           <div className="co-tags">
             {shownNames.map((name, i) => (
               <div key={i} className="tag">
-                {i === 5 && companyNames.length > 6
-                  ? `+${companyNames.length - 5}家`
-                  : name}
+                {i === 5 && companyNames.length > 6 ? `+${companyNames.length - 5}家` : name}
               </div>
             ))}
           </div>
@@ -179,9 +167,7 @@ const AiZhaoKe: React.FC = () => {
                 <div className="fno">1</div>
                 <div className="ft">精准匹配度评分</div>
               </div>
-              <div className="fd">
-                自动评估每家客户的匹配度，0-100分一眼看出谁最值得跟
-              </div>
+              <div className="fd">自动评估每家客户的匹配度，0-100分一眼看出谁最值得跟</div>
             </div>
           </article>
           <article className="feat">
@@ -191,9 +177,7 @@ const AiZhaoKe: React.FC = () => {
                 <div className="fno">2</div>
                 <div className="ft">AI智能打单策略</div>
               </div>
-              <div className="fd">
-                分析客户需求与产品契合度，推荐最值得跟进的前5名
-              </div>
+              <div className="fd">分析客户需求与产品契合度，推荐最值得跟进的前5名</div>
             </div>
           </article>
           <article className="feat">
@@ -203,9 +187,7 @@ const AiZhaoKe: React.FC = () => {
                 <div className="fno">3</div>
                 <div className="ft">个性化话术生成</div>
               </div>
-              <div className="fd">
-                根据客户画像生成开场白，一键复制，提升3倍接通率
-              </div>
+              <div className="fd">根据客户画像生成开场白，一键复制，提升3倍接通率</div>
             </div>
           </article>
           <article className="feat">
@@ -215,9 +197,7 @@ const AiZhaoKe: React.FC = () => {
                 <div className="fno">4</div>
                 <div className="ft">行动计划指导</div>
               </div>
-              <div className="fd">
-                实时同步到飞书多维表格，推荐最优跟进顺序和时机
-              </div>
+              <div className="fd">实时同步到飞书多维表格，推荐最优跟进顺序和时机</div>
             </div>
           </article>
         </section>

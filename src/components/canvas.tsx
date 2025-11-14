@@ -9,7 +9,7 @@ interface Colors {
 interface QRCodeOptions {
   type?: string;
   quality?: number;
-  errorCorrectionLevel?: string;
+  errorCorrectionLevel?: "L" | "M" | "Q" | "H";
   margin?: number;
   scale?: number;
   width?: number;

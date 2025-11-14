@@ -304,6 +304,48 @@
   transform: translateY(-1px);
 }
 
+.credits-detail-page .empty-btn.secondary {
+  background: white;
+  color: #1a1a1a;
+  border: 1.5px solid #1a1a1a;
+}
+
+.credits-detail-page .empty-btn.secondary:hover {
+  background: #1a1a1a;
+  color: white;
+}
+
+/* 加载状态 */
+.credits-detail-page .loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.credits-detail-page .loading-spinner {
+  font-size: 32px;
+  margin-bottom: 16px;
+  animation: spin 1s linear infinite;
+}
+
+.credits-detail-page .loading-text {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* 加载更多 */
 .credits-detail-page .load-more {
   text-align: center;
@@ -325,6 +367,50 @@
   border-color: #1890ff;
   color: #1890ff;
   transform: translateY(-1px);
+}
+
+.credits-detail-page .load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.credits-detail-page .load-more-text {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 12px;
+}
+
+.credits-detail-page .refresh-btn {
+  padding: 8px 16px;
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.credits-detail-page .refresh-btn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  background: #f0f9ff;
+}
+
+/* 刷新图标 */
+.credits-detail-page .refresh-icon {
+  font-size: 16px;
+  margin-left: 8px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.credits-detail-page .refresh-icon:hover {
+  background: #f0f0f0;
+  transform: rotate(180deg);
 }
 
 /* 邀请码弹窗 */

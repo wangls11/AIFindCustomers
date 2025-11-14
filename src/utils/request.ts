@@ -4,7 +4,7 @@ import { getToken, checkAndHandleTokenExpired } from "./auth";
 // 定义响应数据类型
 interface ApiResponse<T = any> {
   code: number;
-  message: string;
+  msg: string;
   data: T;
 }
 
@@ -103,9 +103,7 @@ const defaultResponseInterceptor: ResponseInterceptor = async (response, data) =
 
   // 根据实际接口返回的数据结构判断（除了4000之外的其他错误）
   if (res.code !== 200) {
-    Toast.error(res.message || "请求失败");
-
-    throw new Error(res.message || "失败");
+    throw new Error(res.msg || "失败");
   }
 
   // 如果是成功的响应，直接返回data部分

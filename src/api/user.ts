@@ -1,6 +1,38 @@
 import { post } from "@/utils/request";
 import type { ResultVO } from "./types";
 
+// 分页查询参数类型
+export interface PageParams {
+  pageNO: number; // 当前页
+  pageSize: number; // 当前页数量
+  params?: object; // 业务查询参数，json格式
+}
+
+// 积分明细记录类型
+export interface CreditsDetailRecord {
+  id: string; // 记录ID
+  userId: string; // 用户ID
+  deductionNo: string; // 扣除单号
+  businessType: string; // 业务类型
+  title: string; // 标题
+  businessId: string; // 业务ID
+  amount: number; // 金额
+  changeAmount: number; // 变化金额
+}
+
+// 积分明细响应类型
+export interface CreditsDetailsResponse {
+  total: number; // 总记录数
+  dataList: CreditsDetailRecord[]; // 记录列表
+}
+
+// 用户信息接口
+export interface UserInfo {
+  tokenValue: string; // token值
+  userCode: string; // 用户编码
+  integral: number; // 积分
+}
+
 // 登录参数接口
 export interface LoginParams {
   open_id: string;
@@ -20,7 +52,7 @@ export interface LoginResponse {
  * @returns Promise<LoginResponse>
  */
 export function login(params: LoginParams) {
-  return post<LoginResponse>(`/api/user/login/login`, params);
+  return post<LoginResponse>(`/api/user/login`, params);
 }
 
 // 登录返回的用户信息 VO
@@ -135,4 +167,35 @@ export function getUserAnalysisPlan({
       },
     }
   );
+}
+
+/**
+ * 获取用户信息
+ * @returns Promise<ResultVO<UserInfo>>
+ */
+export function fetchUserInfo() {
+  return post<UserInfo>("/api/user/getUserInfo");
+}
+
+/**
+ * 兑换邀请码
+ * @param {string} exchangeCode 邀请码
+ * @returns Promise<any>
+ */
+export function exchange(exchangeCode: string) {
+  return post(`/api/exchangeKeys/exchange?exchangeCode=${exchangeCode}`);
+}
+
+/**
+ * 获取积分使用明细
+ * @param {object} params 分页查询数据传输对象
+ * @param {number} params.pageNO 当前页
+ * @param {number} params.pageSize 当前页数量
+ * @param {string} params.orderBy 排序方式
+ * @param {string} params.properties 排序字段
+ * @param {object} params.params 业务查询参数，json格式
+ * @returns Promise<ResultVO<CreditsDetailsResponse>>
+ */
+export function getDetails(params: PageParams) {
+  return post<CreditsDetailsResponse>(`/api/user/getDetails`, params);
 }
