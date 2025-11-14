@@ -1,7 +1,10 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import styles from "./HelpAndFeedbackPage.module.css";
+import UserContext from "@/context/UserContext";
+import { Toast } from "@douyinfe/semi-ui";
 
-const HelpAndFeedbackPage = ({ userId = "U20251112001" }) => {
+const HelpAndFeedbackPage = () => {
+  const content = useContext(UserContext);
   const [copyButtonText, setCopyButtonText] = useState("📋 复制ID");
 
   // FAQ数据
@@ -30,38 +33,75 @@ const HelpAndFeedbackPage = ({ userId = "U20251112001" }) => {
   };
 
   // 复制USER ID
-  const copyUserId = () => {
-    navigator.clipboard
-      .writeText(userId)
-      .then(() => {
-        setCopyButtonText("✓ 已复制");
-        setTimeout(() => {
-          setCopyButtonText("📋 复制ID");
-        }, 2000);
-        showToast("USER ID 已复制");
-      })
-      .catch((err) => {
-        console.error("复制失败:", err);
-        showToast("复制失败，请手动复制");
-      });
+  // 兼容性复制：优先使用 Clipboard API，失败时回退到 textarea + execCommand
+  const copyText = async (text: string): Promise<boolean> => {
+    if (!text) return false;
+    // 首选现代 Clipboard API（需要 https / 合适的权限）
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard &&
+        navigator.clipboard.writeText
+      ) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (err) {
+      // 可能因为权限策略或在 iframe 中被阻止，继续走回退方案
+      console.warn(
+        "navigator.clipboard.writeText failed, falling back to execCommand",
+        err
+      );
+    }
+
+    // 回退到 textarea + execCommand
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      // 避免页面跳动
+      textarea.style.position = "fixed";
+      textarea.style.top = "0";
+      textarea.style.left = "0";
+      textarea.style.width = "1px";
+      textarea.style.height = "1px";
+      textarea.style.padding = "0";
+      textarea.style.border = "none";
+      textarea.style.outline = "none";
+      textarea.style.boxShadow = "none";
+      textarea.style.background = "transparent";
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      const successful = document.execCommand && document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return !!successful;
+    } catch (err) {
+      console.error("Fallback copy failed:", err);
+      return false;
+    }
+  };
+
+  const copyUserId = async (userId: string) => {
+    const ok = await copyText(userId);
+    if (ok) {
+      setCopyButtonText("✓ 已复制");
+      setTimeout(() => {
+        setCopyButtonText("📋 复制ID");
+      }, 2000);
+      Toast.success("USER ID 已复制");
+    } else {
+      Toast.error("复制失败，请手动复制");
+    }
   };
 
   // 复制邮箱
-  const copyEmail = () => {
-    navigator.clipboard
-      .writeText("ai@feichuangtech.com")
-      .then(() => {
-        showToast("邮箱已复制");
-      })
-      .catch((err) => {
-        console.error("复制失败:", err);
-        showToast("复制失败，请手动复制");
-      });
-  };
-
-  // 显示提示（实际项目中使用Toast组件）
-  const showToast = (message: string) => {
-    alert(message);
+  const copyEmail = async () => {
+    const ok = await copyText("ai@feichuangtech.com");
+    if (ok) {
+      Toast.success("邮箱已复制");
+    } else {
+      Toast.error("复制失败，请手动复制");
+    }
   };
 
   return (
@@ -85,8 +125,15 @@ const HelpAndFeedbackPage = ({ userId = "U20251112001" }) => {
               <span className={styles.cardIcon}>🆔</span>
               我的 USER ID
             </div>
-            <div className={styles.userIdValue}>{userId}</div>
-            <button className={styles.copyBtn} onClick={copyUserId}>
+            <div className={styles.userIdValue}>
+              {content?.user?.userCode || ""}
+            </div>
+            <button
+              className={styles.copyBtn}
+              onClick={() => {
+                copyUserId(content?.user?.userCode || "");
+              }}
+            >
               <span>{copyButtonText}</span>
             </button>
             <div className={styles.userIdTip}>

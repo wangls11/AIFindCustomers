@@ -615,12 +615,14 @@ const SelectPlanPage: React.FC = () => {
               </div>
               <div className="plan-info">
                 <div className="info-item">
-                  <div className="info-label">处理客户数</div>
+                  <div className="info-item-label">处理客户数</div>
                   <div className="info-value">{recordCount}</div>
                 </div>
                 <div className="info-item">
-                  <div className="info-label">消耗积分</div>
-                  <div className="info-value">50</div>
+                  <div className="info-item-label">消耗积分</div>
+                  <div className="info-value">
+                    {recordCount ? recordCount * 25 : 0}
+                  </div>
                 </div>
               </div>
             </div>
@@ -641,11 +643,11 @@ const SelectPlanPage: React.FC = () => {
                 </div>
                 <div className="plan-info">
                   <div className="info-item">
-                    <div className="info-label">处理客户数</div>
+                    <div className="info-item-label">处理客户数</div>
                     <div className="info-value">{recordCount}</div>
                   </div>
                   <div className="info-item">
-                    <div className="info-label">消耗积分</div>
+                    <div className="info-item-label">消耗积分</div>
                     <div className="info-value">100</div>
                   </div>
                 </div>

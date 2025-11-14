@@ -1,12 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import UserContext from "@/context/UserContext";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import "./MenuButtonWithDropdown.css";
 
-interface MenuProps {
-  credits?: number;
-}
+interface MenuProps {}
 
-const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
+const MenuButtonWithDropdown: React.FC<MenuProps> = () => {
+  const content = useContext(UserContext);
   const [showMenu, setShowMenu] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -75,7 +75,9 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
 
       <div
         ref={dropdownRef}
-        className={`menu-dropdown-user-menu ${showMenu ? "menu-dropdown-show" : ""}`}
+        className={`menu-dropdown-user-menu ${
+          showMenu ? "menu-dropdown-show" : ""
+        }`}
         role="menu"
         aria-hidden={!showMenu}
       >
@@ -88,9 +90,15 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
           <div className="menu-dropdown-menu-item-content">
             <div className="menu-dropdown-menu-item-title">我的积分</div>
             <div className="menu-dropdown-menu-item-desc">
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
                 <div style={{ fontSize: 13, color: "#666" }}>当前积分:</div>
-                <div className="menu-dropdown-credits">{credits.toLocaleString()} 积分</div>
+                <div className="menu-dropdown-credits">
+                  <div className="credits">
+                    {content?.user?.integral || 0} 积分
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -128,7 +136,9 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
           <div className="menu-dropdown-menu-item-icon">🎁</div>
           <div className="menu-dropdown-menu-item-content">
             <div className="menu-dropdown-menu-item-title">使用邀请码</div>
-            <div className="menu-dropdown-menu-item-desc">输入邀请码领取奖励</div>
+            <div className="menu-dropdown-menu-item-desc">
+              输入邀请码领取奖励
+            </div>
           </div>
         </div>
 
@@ -140,13 +150,17 @@ const MenuButtonWithDropdown: React.FC<MenuProps> = ({ credits = 1250 }) => {
           <div className="menu-dropdown-menu-item-icon">❓</div>
           <div className="menu-dropdown-menu-item-content">
             <div className="menu-dropdown-menu-item-title">帮助与反馈</div>
-            <div className="menu-dropdown-menu-item-desc">遇到问题？联系我们</div>
+            <div className="menu-dropdown-menu-item-desc">
+              遇到问题？联系我们
+            </div>
           </div>
         </div>
       </div>
 
       <div
-        className={`menu-dropdown-overlay ${showMenu ? "menu-dropdown-show" : ""}`}
+        className={`menu-dropdown-overlay ${
+          showMenu ? "menu-dropdown-show" : ""
+        }`}
         onClick={closeMenu}
         aria-hidden
       />

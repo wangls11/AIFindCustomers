@@ -23,6 +23,31 @@ export function login(params: LoginParams) {
   return post<LoginResponse>(`/api/user/login/login`, params);
 }
 
+// 登录返回的用户信息 VO
+export interface LoginVO {
+  tokenValue?: string; // token 值
+  userCode?: string; // 用户 id
+  integral?: number; // 积分
+  // 其他可能的字段
+  [key: string]: any;
+}
+
+/**
+ * 获取用户信息
+ * POST /api/user/login/getUserInfo
+ * Content-Type: application/x-www-form-urlencoded
+ * 无请求参数
+ */
+export function getUserInfo() {
+  const params = new URLSearchParams();
+
+  return post<ResultVO<LoginVO>>("/api/user/getUserInfo", params, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+}
+
 export interface UserAnalysisPlanDTO {
   id?: string;
   userId?: string; // 用户id
@@ -73,11 +98,15 @@ export function saveUserAnalysisPlan(dto: UserAnalysisPlanDTO) {
     }
   });
 
-  return post<ResultVO<UserAnalysisPlanDTO>>("/api/user/userAnalysisPlan/save", params, {
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-  });
+  return post<ResultVO<UserAnalysisPlanDTO>>(
+    "/api/user/userAnalysisPlan/save",
+    params,
+    {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    }
+  );
 }
 
 /**
@@ -86,14 +115,24 @@ export function saveUserAnalysisPlan(dto: UserAnalysisPlanDTO) {
  * Content-Type: application/x-www-form-urlencoded
  * 请求参数：userId (string)
  */
-export function getUserAnalysisPlan({ table_id, view_id }: { table_id: string; view_id: string }) {
+export function getUserAnalysisPlan({
+  table_id,
+  view_id,
+}: {
+  table_id: string;
+  view_id: string;
+}) {
   const params = new URLSearchParams();
   params.append("table_id", table_id);
   params.append("view_id", view_id);
 
-  return post<ResultVO<UserAnalysisPlanVO>>("/api/user/userAnalysisPlan/get", params, {
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-  });
+  return post<ResultVO<UserAnalysisPlanVO>>(
+    "/api/user/userAnalysisPlan/get",
+    params,
+    {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    }
+  );
 }
